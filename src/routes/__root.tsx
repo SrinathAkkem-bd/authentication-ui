@@ -27,27 +27,6 @@ const ProfileRoute = createRoute({
   component: Profile,
 });
 
-// Add GitHub callback route
-const GitHubCallbackRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/auth/github/callback",
-  component: () => {
-    const navigate = useNavigate();
-    
-    useEffect(() => {
-      // The session will be automatically set by the backend
-      // Redirect to profile page
-      navigate({ to: "/profile" });
-    }, []);
-
-    return (
-      <Layout>
-        <div className="text-white">Authenticating...</div>
-      </Layout>
-    );
-  },
-});
-
-const routeTree = rootRoute.addChildren([indexRoute, ProfileRoute, GitHubCallbackRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, ProfileRoute]);
 
 export default routeTree;
