@@ -15,7 +15,6 @@ const App = () => {
   return (
     <Layout>
       <div className="items-center flex-col flex bg-[#131313] p-5 rounded-lg">
-        <img src="AuthLogo.png" className="h-[200px]" alt="Auth Logo" />
         <div className="grid gap-2 w-full">
           <GithubLogin />
         </div>
