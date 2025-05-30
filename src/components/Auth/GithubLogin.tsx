@@ -1,11 +1,9 @@
-import { useNavigate } from "@tanstack/react-router";
 import Button from "../Buttons/Button";
 
 const GithubLogin = () => {
-  const navigate = useNavigate();
 
   const handleGithubLogin = () => {
-    window.location.href = "http://localhost:5000/auth/github";
+    window.location.href = "http://localhost:8080/api/api/auth/github/login";
   };
 
   return (

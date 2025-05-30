@@ -18,18 +18,9 @@ const Profile = () => {
   const logout = async () => {
     try {
       await Axios.get("/auth/logout");
-      navigate({ to: "/auth/login" });
+      navigate({ to: "/" });
     } catch (error) {
       console.error("Error logging out:", error);
-    }
-  };
-
-  const deleteAccount = async () => {
-    try {
-      await Axios.delete("/api/delete-account");
-      navigate({ to: "/auth/login" });
-    } catch (error) {
-      console.error("Error deleting account:", error);
     }
   };
 
@@ -42,6 +33,9 @@ const Profile = () => {
     queryFn: async () => {
       return useToken();
     },
+    staleTime: 300000,
+    refetchOnWindowFocus: false,
+    retry: false
   });
 
   if (isLoading) {
@@ -66,37 +60,13 @@ const Profile = () => {
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <h2 className="text-[20px] text-gray-100">Name:</h2>
-              <p className="text-gray-300">{datas.user.name}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <h2 className="text-[20px] text-gray-100">Email:</h2>
-              <p className="text-gray-300">{datas.email}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <h2 className="text-[20px] text-gray-100">Role:</h2>
-              <p className="text-gray-300">{datas.user.role}</p>
+              <p className="text-gray-300">{datas.name}</p>
             </div>
 
             <div className="grid gap-3">
               <Button onClick={logout}>Logout</Button>
-              <Button onClick={deleteAccount}>Delete Account</Button>
-              {/* <a
-                href="/member/list"
-                className="text-red-500 hover:text-green-600"
-              >
-                Member List
-              </a> */}
             </div>
           </div>
-        </div>
-        <div>
-          <img
-            src={`${datas?.user.avatarUrl}`}
-            alt="Profile"
-            className="rounded-full h-[300px]"
-          />
         </div>
       </div>
     </Layout>

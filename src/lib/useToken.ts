@@ -3,7 +3,7 @@ import { UseNavigateResult } from "@tanstack/react-router";
 
 const useToken = async () => {
   try {
-    const response = await Axios.get("/api/session");
+    const response = await Axios.get("/auth/user_info");
 
     return response.data;
   } catch (error) {
@@ -17,7 +17,7 @@ export const isAuthenticated = async (navigate: UseNavigateResult<string>) => {
     await useToken();
   } catch (error) {
     // If there is no session
-    navigate({ to: "/auth/login" });
+    navigate({ to: "/" });
     console.error("Error getting session:", error);
   }
 };
