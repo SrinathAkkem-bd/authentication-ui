@@ -5,7 +5,8 @@ const GithubLogin = () => {
   const navigate = useNavigate();
 
   const handleGithubLogin = () => {
-    window.location.href = "http://localhost:5000/auth/github";
+    // Update the redirect_uri to match our new callback route
+    window.location.href = "http://localhost:5000/auth/github?redirect_uri=http://localhost:3000/auth/github/callback";
   };
 
   return (
