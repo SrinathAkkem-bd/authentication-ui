@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 
 import Layout from "../components/Layout/Layout";
-import GithubLogin from "../components/Auth/GithubLogin";
+import GithubLogin from "./Auth/GithubLogin";
 import { isNotAuthenticated } from "../lib/useToken";
 
 const App = () => {

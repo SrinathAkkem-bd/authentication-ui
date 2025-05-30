@@ -5,20 +5,6 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
-type LoginState = {
-  email: string;
-  password: string;
-};
-
-type RegisterState = {
-  user: {
-    name: string;
-    avatarUrl: File | null;
-  };
-  email: string;
-  password: string;
-};
-
 type InputProps = {
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   type?: string;

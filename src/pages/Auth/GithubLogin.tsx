@@ -1,4 +1,4 @@
-import Button from "../Buttons/Button";
+import Button from "../../components/Buttons/Button.tsx";
 
 const GithubLogin = () => {
 
