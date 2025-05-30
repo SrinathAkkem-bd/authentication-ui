@@ -3,8 +3,6 @@ import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import App from "../pages/App";
-import Login from "../pages/Auth/Login";
-import Register from "../pages/Auth/Register";
 import Profile from "../pages/Profile/Profile";
 
 const queryClient = new QueryClient();
@@ -29,23 +27,6 @@ const ProfileRoute = createRoute({
   component: Profile,
 });
 
-const LoginRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/auth/login",
-  component: Login,
-});
-
-const RegisterRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/auth/register",
-  component: Register,
-});
-
-const routeTree = rootRoute.addChildren([
-  indexRoute,
-  ProfileRoute,
-  LoginRoute,
-  RegisterRoute,
-]);
+const routeTree = rootRoute.addChildren([indexRoute, ProfileRoute]);
 
 export default routeTree;
