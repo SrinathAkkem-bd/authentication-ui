@@ -45,7 +45,7 @@ const Profile = () => {
     logger.error("Error fetching session:", error);
     return (
       <Layout>
-        <p>Error: {error.message}</p>
+        <p className="text-red-500">An error occurred while loading your profile. Please try logging in again.</p>
       </Layout>
     );
   }

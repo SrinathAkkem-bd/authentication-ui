@@ -7,7 +7,14 @@ import Profile from "../pages/Profile/Profile";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 export const rootRoute = createRootRoute({
   component: () => (
@@ -22,13 +29,23 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: async () => {
     try {
-      await useToken();
+      const userData = await useToken();
       logger.info("User is authenticated, redirecting to profile");
       throw redirect({
-        to: "/profile"
+        to: "/profile",
+        search: {
+          user: userData.name,
+        },
       });
     } catch (error) {
-      logger.info("User is not authenticated, staying on login page");
+      if (error instanceof Response && error.status === 401) {
+        logger.info("User is not authenticated, staying on login page");
+        return {};
+      }
+      if (error instanceof Error && error.name === "RedirectError") {
+        throw error;
+      }
+      logger.error("Unexpected error during authentication check:", error);
       return {};
     }
   },
@@ -40,13 +57,15 @@ const ProfileRoute = createRoute({
   path: "/profile",
   beforeLoad: async () => {
     try {
-      await useToken();
+      const userData = await useToken();
       logger.info("User is authenticated, allowing access to profile");
-      return {};
+      return {
+        userData,
+      };
     } catch (error) {
       logger.error("User is not authenticated, redirecting to login");
       throw redirect({
-        to: "/"
+        to: "/",
       });
     }
   },
