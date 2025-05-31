@@ -1,10 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-
-import Axios from "../../lib/Axios";
 import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
-import useToken from "../../lib/useToken";
+import Axios from "../../lib/Axios";
 import { BaseComponent } from "../../utils/logger";
 import { sessionStore } from "../../routes/__root";
 
@@ -23,6 +20,14 @@ class ProfileComponent extends BaseComponent {
       this.log.error("Error logging out:", error);
     }
   }
+
+  debugProfileData(sessionData: any) {
+    if (sessionData) {
+      this.log.debug("Profile Data:", sessionData);
+    } else {
+      this.log.warn("No session data found");
+    }
+  }
 }
 
 const profileComponent = new ProfileComponent();
@@ -30,19 +35,10 @@ const profileComponent = new ProfileComponent();
 const Profile = () => {
   const navigate = useNavigate();
   const logout = () => profileComponent.handleLogout(navigate);
-  
-  const { data: datas } = useQuery({
-    queryKey: ["token"],
-    queryFn: useToken,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    retry: false,
-    suspense: true,
-  });
 
-  profileComponent.log.debug("Profile data loaded:", datas);
+  const sessionData = sessionStore.getSession();
+  profileComponent.debugProfileData(sessionData);
+
   return (
     <Layout>
       <div className="flex justify-between items-center max-w-[700px] w-full bg-[#131313] p-4 rounded-[16px]">
@@ -52,7 +48,7 @@ const Profile = () => {
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <h2 className="text-[20px] text-gray-100">Name:</h2>
-              <p className="text-gray-300">{datas.name}</p>
+              <p className="text-gray-300">{sessionData?.name}</p>
             </div>
 
             <div className="grid gap-3">

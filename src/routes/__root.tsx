@@ -15,11 +15,9 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
       refetchOnMount: false,
-      suspense: true,
     },
   },
 });
@@ -62,7 +60,7 @@ const indexRoute = createRoute({
         },
       });
     } catch (error) {
-      if (error instanceof Response && error.status === 401) {
+      if (error instanceof Error && error.message.includes("401")) {
         logger.info("Route", "No active session, staying on login page");
         return {};
       }
