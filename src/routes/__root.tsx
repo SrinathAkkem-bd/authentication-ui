@@ -6,6 +6,7 @@ import App from "../pages/App";
 import Profile from "../pages/Profile/Profile";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
+import SessionStore from "../lib/sessionStore";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,6 +22,8 @@ const queryClient = new QueryClient({
   },
 });
 
+export const sessionStore = new SessionStore(queryClient);
+
 export const rootRoute = createRootRoute({
   component: () => (
     <QueryClientProvider client={queryClient}>
@@ -34,19 +37,19 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: async () => {
     try {
-      const cachedData = queryClient.getQueryData(["token"]);
-      if (cachedData) {
-        logger.info("Route", "Using cached user data, redirecting to profile");
+      const sessionData = sessionStore.getSession();
+      if (sessionData) {
+        logger.info("Route", "Using session data, redirecting to profile");
         return redirect({
           to: "/profile",
           search: {
-            user: cachedData.name,
+            user: sessionData.name,
           },
         });
       }
 
       const userData = await useToken();
-      queryClient.setQueryData(["token"], userData);
+      sessionStore.setSession(userData);
       logger.info("Route", "User is authenticated, redirecting to profile");
       return redirect({
         to: "/profile",
@@ -74,14 +77,14 @@ const ProfileRoute = createRoute({
   path: "/profile",
   beforeLoad: async () => {
     try {
-      const cachedData = queryClient.getQueryData(["token"]);
-      if (cachedData) {
-        logger.info("Route", "Using cached user data for profile");
-        return { userData: cachedData };
+      const sessionData = sessionStore.getSession();
+      if (sessionData) {
+        logger.info("Route", "Using session data for profile");
+        return { userData: sessionData };
       }
 
       const userData = await useToken();
-      queryClient.setQueryData(["token"], userData);
+      sessionStore.setSession(userData);
       logger.info("Route", "User is authenticated, allowing access to profile");
       return {
         userData,

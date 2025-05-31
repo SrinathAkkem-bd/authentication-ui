@@ -7,6 +7,7 @@ import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
 import useToken from "../../lib/useToken";
 import { BaseComponent } from "../../utils/logger";
+import { sessionStore } from "../../routes/__root";
 
 class ProfileComponent extends BaseComponent {
   constructor() {
@@ -16,6 +17,7 @@ class ProfileComponent extends BaseComponent {
   async handleLogout(navigate: ReturnType<typeof useNavigate>) {
     try {
       await Axios.get("/auth/logout");
+      sessionStore.clearSession();
       this.log.success("User logged out successfully");
       navigate({ to: "/" });
     } catch (error) {
