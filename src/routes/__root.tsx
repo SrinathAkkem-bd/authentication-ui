@@ -37,9 +37,9 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: async () => {
     try {
-      const sessionData = sessionStore.getSession();
-      if (sessionData) {
-        logger.info("Route", "Using session data, redirecting to profile");
+      if (sessionStore.hasActiveSession()) {
+        const sessionData = sessionStore.getSession()!;
+        logger.info("Route", "Active session found, redirecting to profile");
         return redirect({
           to: "/profile",
           search: {
@@ -50,7 +50,7 @@ const indexRoute = createRoute({
 
       const userData = await useToken();
       sessionStore.setSession(userData);
-      logger.info("Route", "User is authenticated, redirecting to profile");
+      logger.info("Route", "User authenticated, creating session and redirecting to profile");
       return redirect({
         to: "/profile",
         search: {
@@ -59,7 +59,7 @@ const indexRoute = createRoute({
       });
     } catch (error) {
       if (error instanceof Response && error.status === 401) {
-        logger.info("Route", "User is not authenticated, staying on login page");
+        logger.info("Route", "No active session, staying on login page");
         return {};
       }
       if (error instanceof Error && error.name === "RedirectError") {
@@ -77,20 +77,21 @@ const ProfileRoute = createRoute({
   path: "/profile",
   beforeLoad: async () => {
     try {
-      const sessionData = sessionStore.getSession();
-      if (sessionData) {
-        logger.info("Route", "Using session data for profile");
+      if (sessionStore.hasActiveSession()) {
+        const sessionData = sessionStore.getSession()!;
+        logger.info("Route", "Using existing session data for profile");
         return { userData: sessionData };
       }
 
       const userData = await useToken();
       sessionStore.setSession(userData);
-      logger.info("Route", "User is authenticated, allowing access to profile");
+      logger.info("Route", "Creating new session for profile");
       return {
         userData,
       };
     } catch (error) {
-      logger.error("Route", "User is not authenticated, redirecting to login");
+      logger.error("Route", "No valid session found, redirecting to login");
+      sessionStore.clearSession();
       return redirect({
         to: "/",
       });

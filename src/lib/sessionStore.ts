@@ -8,6 +8,7 @@ export type SessionData = {
 
 class SessionStore extends BaseComponent {
   private queryClient: QueryClient;
+  private readonly SESSION_KEY = ['session'];
 
   constructor(queryClient: QueryClient) {
     super('SessionStore');
@@ -16,16 +17,22 @@ class SessionStore extends BaseComponent {
 
   setSession(data: SessionData) {
     this.log.debug('Setting session data:', data);
-    this.queryClient.setQueryData(['session'], data);
+    this.queryClient.setQueryData(this.SESSION_KEY, data);
   }
 
   getSession(): SessionData | undefined {
-    return this.queryClient.getQueryData(['session']);
+    const data = this.queryClient.getQueryData<SessionData>(this.SESSION_KEY);
+    this.log.debug('Getting session data:', data);
+    return data;
   }
 
   clearSession() {
     this.log.debug('Clearing session data');
-    this.queryClient.removeQueries({ queryKey: ['session'] });
+    this.queryClient.removeQueries({ queryKey: this.SESSION_KEY });
+  }
+
+  hasActiveSession(): boolean {
+    return this.getSession() !== undefined;
   }
 }
 
