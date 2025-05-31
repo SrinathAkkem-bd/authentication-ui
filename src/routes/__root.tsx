@@ -45,7 +45,7 @@ const indexRoute = createRoute({
       if (error instanceof Error && error.name === "RedirectError") {
         throw error;
       }
-      logger.error(`Unexpected error during authentication check: ${error}`);
+      logger.error("[Routes]",`Unexpected error during authentication check: ${error}`);
       return {};
     }
   },
