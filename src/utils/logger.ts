@@ -5,41 +5,63 @@ type LogLevel = 'info' | 'warn' | 'error' | 'success' | 'debug';
 class Logger {
   private getPrefix(level: LogLevel): string {
     const timestamp = new Date().toISOString();
+    const message = `[${timestamp}] `;
+    
     switch (level) {
       case 'info':
-        return colors.blue(`[${timestamp}] ℹ️ INFO:`);
+        return message + 'ℹ️ INFO:';
       case 'warn':
-        return colors.yellow(`[${timestamp}] ⚠️ WARN:`);
+        return message + '⚠️ WARN:';
       case 'error':
-        return colors.red(`[${timestamp}] ❌ ERROR:`);
+        return message + '❌ ERROR:';
       case 'success':
-        return colors.green(`[${timestamp}] ✅ SUCCESS:`);
+        return message + '✅ SUCCESS:';
       case 'debug':
-        return colors.magenta(`[${timestamp}] 🔍 DEBUG:`);
+        return message + '🔍 DEBUG:';
       default:
-        return `[${timestamp}]`;
+        return message;
+    }
+  }
+
+  private sendToServer(level: LogLevel, message: string, ...args: any[]) {
+    // Send log to the dev server
+    if (import.meta.env.DEV) {
+      const event = new CustomEvent('vite:log', {
+        detail: { level, message, args, timestamp: new Date().toISOString() }
+      });
+      window.dispatchEvent(event);
     }
   }
 
   info(message: string, ...args: any[]) {
-    console.log(this.getPrefix('info'), message, ...args);
+    const prefix = this.getPrefix('info');
+    console.log(prefix, message, ...args);
+    this.sendToServer('info', message, ...args);
   }
 
   warn(message: string, ...args: any[]) {
-    console.warn(this.getPrefix('warn'), message, ...args);
+    const prefix = this.getPrefix('warn');
+    console.warn(prefix, message, ...args);
+    this.sendToServer('warn', message, ...args);
   }
 
   error(message: string, ...args: any[]) {
-    console.error(this.getPrefix('error'), message, ...args);
+    const prefix = this.getPrefix('error');
+    console.error(prefix, message, ...args);
+    this.sendToServer('error', message, ...args);
   }
 
   success(message: string, ...args: any[]) {
-    console.log(this.getPrefix('success'), message, ...args);
+    const prefix = this.getPrefix('success');
+    console.log(prefix, message, ...args);
+    this.sendToServer('success', message, ...args);
   }
 
   debug(message: string, ...args: any[]) {
     if (import.meta.env.DEV) {
-      console.log(this.getPrefix('debug'), message, ...args);
+      const prefix = this.getPrefix('debug');
+      console.log(prefix, message, ...args);
+      this.sendToServer('debug', message, ...args);
     }
   }
 }
