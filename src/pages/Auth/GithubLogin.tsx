@@ -1,13 +1,22 @@
 import Button from "../../components/Buttons/Button.tsx";
+import { BaseComponent } from "../../utils/logger";
+
+class GithubLoginComponent extends BaseComponent {
+  constructor() {
+    super('GithubLogin');
+  }
+
+  handleGithubLogin() {
+    this.log.info("Redirecting to GitHub login");
+    window.location.href = import.meta.env.VITE_AUTH_GITHUB_URL;
+  }
+}
+
+const githubLoginComponent = new GithubLoginComponent();
 
 const GithubLogin = () => {
-
-  const handleGithubLogin = () => {
-    window.location.href = "http://localhost:8080/api/api/auth/github/login";
-  };
-
   return (
-    <Button onClick={handleGithubLogin}>
+    <Button onClick={() => githubLoginComponent.handleGithubLogin()}>
       <div className="flex items-center justify-center gap-2">
         <svg
           className="w-5 h-5"
