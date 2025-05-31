@@ -4,7 +4,8 @@ import CryptoJS from 'crypto-js';
 
 export type SessionData = {
   name: string;
-  // Add other session data fields as needed
+  data?: Record<string, any>;
+  lastModified?: number;
 };
 
 class SessionStore extends BaseComponent {
@@ -47,19 +48,48 @@ class SessionStore extends BaseComponent {
     }, this.SESSION_TIMEOUT);
   }
 
+  private updateSession(sessionData: SessionData) {
+    try {
+      const encryptedData = this.encrypt({
+        ...sessionData,
+        lastModified: Date.now()
+      });
+      
+      this.queryClient.setQueryData(this.SESSION_KEY, {
+        data: encryptedData,
+        timestamp: Date.now()
+      });
+      
+      this.startSessionTimer();
+      this.log.debug('Session updated successfully');
+      return true;
+    } catch (error) {
+      this.log.error('Failed to update session:', error);
+      return false;
+    }
+  }
+
   setSession(data: SessionData) {
     try {
-      const encryptedData = this.encrypt(data);
+      const encryptedData = this.encrypt({
+        ...data,
+        data: data.data || {},
+        lastModified: Date.now()
+      });
+      
       const sessionData = {
         data: encryptedData,
         timestamp: Date.now()
       };
+      
       this.queryClient.setQueryData(this.SESSION_KEY, sessionData);
       this.startSessionTimer();
       this.log.debug('Session data encrypted and stored');
+      return true;
     } catch (error) {
       this.log.error('Failed to set session data:', error);
       this.clearSession();
+      return false;
     }
   }
 
@@ -71,7 +101,6 @@ class SessionStore extends BaseComponent {
         return undefined;
       }
 
-      // Check session age
       if (Date.now() - sessionData.timestamp > this.SESSION_TIMEOUT) {
         this.log.warn('Session expired');
         this.clearSession();
@@ -79,12 +108,85 @@ class SessionStore extends BaseComponent {
       }
 
       const decryptedData = this.decrypt(sessionData.data);
-      this.startSessionTimer(); // Reset timer on access
+      this.startSessionTimer();
       return decryptedData;
     } catch (error) {
       this.log.error('Failed to get session data:', error);
       this.clearSession();
       return undefined;
+    }
+  }
+
+  // CRUD Operations for session data
+  create(key: string, value: any): boolean {
+    try {
+      const session = this.getSession();
+      if (!session) return false;
+
+      if (session.data?.[key] !== undefined) {
+        this.log.warn(`Key "${key}" already exists in session`);
+        return false;
+      }
+
+      return this.updateSession({
+        ...session,
+        data: {
+          ...session.data,
+          [key]: value
+        }
+      });
+    } catch (error) {
+      this.log.error('Failed to create session data:', error);
+      return false;
+    }
+  }
+
+  read(key: string): any {
+    try {
+      const session = this.getSession();
+      return session?.data?.[key];
+    } catch (error) {
+      this.log.error('Failed to read session data:', error);
+      return undefined;
+    }
+  }
+
+  update(key: string, value: any): boolean {
+    try {
+      const session = this.getSession();
+      if (!session) return false;
+
+      if (session.data?.[key] === undefined) {
+        this.log.warn(`Key "${key}" not found in session`);
+        return false;
+      }
+
+      return this.updateSession({
+        ...session,
+        data: {
+          ...session.data,
+          [key]: value
+        }
+      });
+    } catch (error) {
+      this.log.error('Failed to update session data:', error);
+      return false;
+    }
+  }
+
+  delete(key: string): boolean {
+    try {
+      const session = this.getSession();
+      if (!session || !session.data?.[key]) return false;
+
+      const { [key]: _, ...remainingData } = session.data;
+      return this.updateSession({
+        ...session,
+        data: remainingData
+      });
+    } catch (error) {
+      this.log.error('Failed to delete session data:', error);
+      return false;
     }
   }
 
