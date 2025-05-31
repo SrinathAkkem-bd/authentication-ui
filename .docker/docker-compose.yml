@@ -1,15 +1,16 @@
-version: '3.8'
-
 services:
   frontend:
     build:
-      context: .
+      context: ..
       dockerfile: .docker/Dockerfile
     container_name: auth-frontend
     ports:
       - "8080:8080"
     networks:
       - app-network
+    volumes:
+      - ../:/app
+      - /app/node_modules
     environment:
       - NODE_ENV=production
 
