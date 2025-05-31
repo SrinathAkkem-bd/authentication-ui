@@ -12,6 +12,11 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      refetchOnMount: false,
+      suspense: true,
     },
   },
 });
@@ -29,8 +34,20 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: async () => {
     try {
+      const cachedData = queryClient.getQueryData(["token"]);
+      if (cachedData) {
+        logger.info("Route", "Using cached user data, redirecting to profile");
+        return redirect({
+          to: "/profile",
+          search: {
+            user: cachedData.name,
+          },
+        });
+      }
+
       const userData = await useToken();
-      logger.info("Route","User is authenticated, redirecting to profile");
+      queryClient.setQueryData(["token"], userData);
+      logger.info("Route", "User is authenticated, redirecting to profile");
       return redirect({
         to: "/profile",
         search: {
@@ -39,13 +56,13 @@ const indexRoute = createRoute({
       });
     } catch (error) {
       if (error instanceof Response && error.status === 401) {
-        logger.info("Route","User is not authenticated, staying on login page");
+        logger.info("Route", "User is not authenticated, staying on login page");
         return {};
       }
       if (error instanceof Error && error.name === "RedirectError") {
         throw error;
       }
-      logger.error("Route",`Unexpected error during authentication check: ${error}`);
+      logger.error("Route", `Unexpected error during authentication check: ${error}`);
       return {};
     }
   },
@@ -57,13 +74,20 @@ const ProfileRoute = createRoute({
   path: "/profile",
   beforeLoad: async () => {
     try {
+      const cachedData = queryClient.getQueryData(["token"]);
+      if (cachedData) {
+        logger.info("Route", "Using cached user data for profile");
+        return { userData: cachedData };
+      }
+
       const userData = await useToken();
-      logger.info("Route","User is authenticated, allowing access to profile");
+      queryClient.setQueryData(["token"], userData);
+      logger.info("Route", "User is authenticated, allowing access to profile");
       return {
         userData,
       };
     } catch (error) {
-      logger.error("Route","User is not authenticated, redirecting to login");
+      logger.error("Route", "User is not authenticated, redirecting to login");
       return redirect({
         to: "/",
       });
