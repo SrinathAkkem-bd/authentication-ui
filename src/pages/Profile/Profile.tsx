@@ -7,6 +7,7 @@ import Axios from "../../lib/Axios";
 import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
 import useToken, { isAuthenticated } from "../../lib/useToken";
+import { logger } from "../../utils/logger";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -18,9 +19,10 @@ const Profile = () => {
   const logout = async () => {
     try {
       await Axios.get("/auth/logout");
+      logger.success("User logged out successfully");
       navigate({ to: "/" });
     } catch (error) {
-      console.error("Error logging out:", error);
+      logger.error("Error logging out:", error);
     }
   };
 
@@ -31,6 +33,7 @@ const Profile = () => {
   } = useQuery({
     queryKey: ["token"],
     queryFn: async () => {
+      logger.info("Fetching user token");
       return useToken();
     },
     staleTime: 300000,
@@ -39,11 +42,12 @@ const Profile = () => {
   });
 
   if (isLoading) {
+    logger.debug("Loading user profile");
     return <Loading />;
   }
 
   if (error) {
-    console.error("Error fetching session:", error);
+    logger.error("Error fetching session:", error);
     return (
       <Layout>
         <p>Error: {error.message}</p>
@@ -51,6 +55,7 @@ const Profile = () => {
     );
   }
 
+  logger.debug("Profile data loaded:", datas);
   return (
     <Layout>
       <div className="flex justify-between items-center max-w-[700px] w-full bg-[#131313] p-4 rounded-[16px]">
@@ -73,4 +78,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default Profile
