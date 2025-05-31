@@ -1,11 +1,11 @@
 class Logger {
   private sendToServer(level: string, message: string, ...args: any[]) {
     if (import.meta.env.DEV) {
-      // @ts-ignore
-      if (typeof window !== 'undefined' && window._ws) {
-        // @ts-ignore
-        window._ws.send('custom:log', { level, message, args });
+      if (import.meta.hot) {
+        import.meta.hot.send('custom:log', { level, message, args });
       }
+      // Also log to console for immediate feedback
+      console.log(`[${level.toUpperCase()}]`, message, ...args);
     }
   }
 
