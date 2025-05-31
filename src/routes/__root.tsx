@@ -30,7 +30,7 @@ const indexRoute = createRoute({
   beforeLoad: async () => {
     try {
       const userData = await useToken();
-      logger.info("User is authenticated, redirecting to profile");
+      logger.info("Route","User is authenticated, redirecting to profile");
       return redirect({
         to: "/profile",
         search: {
@@ -39,13 +39,13 @@ const indexRoute = createRoute({
       });
     } catch (error) {
       if (error instanceof Response && error.status === 401) {
-        logger.info("User is not authenticated, staying on login page");
+        logger.info("Route","User is not authenticated, staying on login page");
         return {};
       }
       if (error instanceof Error && error.name === "RedirectError") {
         throw error;
       }
-      logger.error("[Routes]",`Unexpected error during authentication check: ${error}`);
+      logger.error("Route",`Unexpected error during authentication check: ${error}`);
       return {};
     }
   },
@@ -58,12 +58,12 @@ const ProfileRoute = createRoute({
   beforeLoad: async () => {
     try {
       const userData = await useToken();
-      logger.info("User is authenticated, allowing access to profile");
+      logger.info("Route","User is authenticated, allowing access to profile");
       return {
         userData,
       };
     } catch (error) {
-      logger.error("User is not authenticated, redirecting to login");
+      logger.error("Route","User is not authenticated, redirecting to login");
       return redirect({
         to: "/",
       });
