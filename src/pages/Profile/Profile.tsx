@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -6,15 +5,11 @@ import Loading from "./Loading";
 import Axios from "../../lib/Axios";
 import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
-import useToken, { isAuthenticated } from "../../lib/useToken";
+import useToken from "../../lib/useToken";
 import { logger } from "../../utils/logger";
 
 const Profile = () => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    isAuthenticated(navigate);
-  }, []);
 
   const logout = async () => {
     try {
@@ -78,4 +73,4 @@ const Profile = () => {
   );
 };
 
-export default Profile
+export default Profile;
