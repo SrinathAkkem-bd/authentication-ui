@@ -1,9 +1,11 @@
 import { createRoute, redirect } from "@tanstack/react-router";
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Suspense } from "react";
 
 import App from "../pages/App";
 import Profile from "../pages/Profile/Profile";
+import Loading from "../pages/Profile/Loading";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
 import SessionStore from "../lib/sessionStore";
@@ -27,7 +29,9 @@ export const sessionStore = new SessionStore(queryClient);
 export const rootRoute = createRootRoute({
   component: () => (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <Suspense fallback={<Loading />}>
+        <Outlet />
+      </Suspense>
     </QueryClientProvider>
   ),
 });

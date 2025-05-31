@@ -1,7 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 
-import Loading from "./Loading";
 import Axios from "../../lib/Axios";
 import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
@@ -30,37 +29,18 @@ const profileComponent = new ProfileComponent();
 
 const Profile = () => {
   const navigate = useNavigate();
-
   const logout = () => profileComponent.handleLogout(navigate);
-
-  const {
-    isLoading,
-    error,
-    data: datas,
-  } = useQuery({
+  
+  const { data: datas } = useQuery({
     queryKey: ["token"],
     queryFn: useToken,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     retry: false,
     suspense: true,
   });
-
-  if (isLoading) {
-    profileComponent.log.debug("Loading user profile");
-    return <Loading />;
-  }
-
-  if (error) {
-    profileComponent.log.error("Error fetching session:", error);
-    return (
-      <Layout>
-        <p className="text-red-500">An error occurred while loading your profile. Please try logging in again.</p>
-      </Layout>
-    );
-  }
 
   profileComponent.log.debug("Profile data loaded:", datas);
   return (
