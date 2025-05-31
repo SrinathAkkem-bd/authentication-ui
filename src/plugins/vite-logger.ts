@@ -26,45 +26,22 @@ class TerminalLogger {
   }
 }
 
-export function customLogger(): Plugin {
-  const logger = new TerminalLogger();
+const terminalLogger = new TerminalLogger();
 
+export function customLogger(): Plugin {
   return {
     name: 'vite-custom-logger',
     configureServer(server) {
-      server.middlewares.use((req, _, next) => {
-        logger.log('info', `${req.method} ${req.url}`);
-        next();
+      // Listen for custom log events from the client
+      server.ws.on('custom:log', (data) => {
+        const { level, message, args } = data;
+        terminalLogger.log(level, message, ...args);
       });
 
-      const originalPrint = server.printUrls;
-      server.printUrls = () => {
-        const interfaces = server.httpServer?.address();
-        if (!interfaces) return;
-
-        logger.log('success', '🚀 Development server started!');
-        logger.log('info', `Local: ${colors.blue(`http://localhost:${server.config.server?.port}`)}`);
-        
-        if (server.config.server?.host === true) {
-          logger.log('info', `Network: ${colors.blue(`http://${server.resolvedUrls?.network[0]}`)}`);
-        }
-      };
-    },
-    buildStart() {
-      logger.log('info', '📦 Build process starting...');
-    },
-    buildEnd() {
-      logger.log('success', '✨ Build completed successfully!');
-    },
-    handleHotUpdate({ file }) {
-      logger.log('info', `🔄 Hot Update: ${colors.dim(file)}`);
-      return;
-    },
-    transform(code, id) {
-      if (id.includes('src')) {
-        logger.log('debug', `Transforming: ${colors.dim(id)}`);
-      }
-      return null;
+      server.middlewares.use((req, _, next) => {
+        terminalLogger.log('info', `${req.method} ${req.url}`);
+        next();
+      });
     }
   };
 }
