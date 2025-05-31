@@ -12,14 +12,22 @@ class SessionStore extends BaseComponent {
   private queryClient: QueryClient;
   private readonly SESSION_KEY = ['session'];
   private readonly ENCRYPTION_KEY: string;
-  private readonly SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  private readonly SESSION_TIMEOUT: number;
+  private readonly SESSION_RENEWAL_THRESHOLD: number;
   private sessionTimer: number | null = null;
+  private renewalTimer: number | null = null;
 
   constructor(queryClient: QueryClient) {
     super('SessionStore');
     this.queryClient = queryClient;
-    // Generate a random encryption key on instantiation
     this.ENCRYPTION_KEY = CryptoJS.lib.WordArray.random(256/8).toString();
+    
+    // Get configuration from environment variables
+    this.SESSION_TIMEOUT = parseInt(import.meta.env.VITE_SESSION_TIMEOUT || '1800000', 10);
+    this.SESSION_RENEWAL_THRESHOLD = parseInt(import.meta.env.VITE_SESSION_RENEWAL_THRESHOLD || '300000', 10);
+    
+    this.log.debug(`Session timeout set to ${this.SESSION_TIMEOUT}ms`);
+    this.log.debug(`Session renewal threshold set to ${this.SESSION_RENEWAL_THRESHOLD}ms`);
   }
 
   private encrypt(data: any): string {
@@ -37,15 +45,50 @@ class SessionStore extends BaseComponent {
     }
   }
 
+  private async renewSession() {
+    try {
+      const currentSession = this.getSession();
+      if (!currentSession) return;
+
+      // Attempt to renew the session with the server
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/renew`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        // Update the session timestamp
+        this.updateSession(currentSession);
+        this.log.debug('Session renewed successfully');
+      } else {
+        this.log.warn('Failed to renew session');
+        this.clearSession();
+        window.location.href = '/';
+      }
+    } catch (error) {
+      this.log.error('Error renewing session:', error);
+    }
+  }
+
   private startSessionTimer() {
     if (this.sessionTimer) {
       window.clearTimeout(this.sessionTimer);
     }
+    if (this.renewalTimer) {
+      window.clearTimeout(this.renewalTimer);
+    }
+
+    // Set timer for session expiration
     this.sessionTimer = window.setTimeout(() => {
       this.log.info('Session timeout reached');
       this.clearSession();
       window.location.href = '/';
     }, this.SESSION_TIMEOUT);
+
+    // Set timer for session renewal
+    const timeUntilRenewal = this.SESSION_TIMEOUT - this.SESSION_RENEWAL_THRESHOLD;
+    this.renewalTimer = window.setTimeout(() => {
+      this.renewSession();
+    }, timeUntilRenewal);
   }
 
   private updateSession(sessionData: SessionData) {
@@ -101,10 +144,16 @@ class SessionStore extends BaseComponent {
         return undefined;
       }
 
-      if (Date.now() - sessionData.timestamp > this.SESSION_TIMEOUT) {
+      const timeElapsed = Date.now() - sessionData.timestamp;
+      if (timeElapsed > this.SESSION_TIMEOUT) {
         this.log.warn('Session expired');
         this.clearSession();
         return undefined;
+      }
+
+      // If approaching timeout, trigger renewal
+      if (timeElapsed > (this.SESSION_TIMEOUT - this.SESSION_RENEWAL_THRESHOLD)) {
+        this.renewSession();
       }
 
       const decryptedData = this.decrypt(sessionData.data);
@@ -194,6 +243,10 @@ class SessionStore extends BaseComponent {
     if (this.sessionTimer) {
       window.clearTimeout(this.sessionTimer);
       this.sessionTimer = null;
+    }
+    if (this.renewalTimer) {
+      window.clearTimeout(this.renewalTimer);
+      this.renewalTimer = null;
     }
     this.queryClient.removeQueries({ queryKey: this.SESSION_KEY });
     this.log.debug('Session cleared');

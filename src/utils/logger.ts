@@ -1,5 +1,25 @@
 class Logger {
+  private readonly LOG_LEVEL: string;
+  private readonly LOG_LEVELS = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    success: 2,
+    debug: 3
+  };
+
+  constructor() {
+    this.LOG_LEVEL = import.meta.env.VITE_LOG_LEVEL || 'info';
+  }
+
+  private shouldLog(level: string): boolean {
+    return this.LOG_LEVELS[level as keyof typeof this.LOG_LEVELS] <= 
+           this.LOG_LEVELS[this.LOG_LEVEL as keyof typeof this.LOG_LEVELS];
+  }
+
   private sendToServer(className: string, level: string, message: string, ...args: any[]) {
+    if (!this.shouldLog(level)) return;
+
     if (import.meta.env.DEV) {
       const prefix = className ? `[${className}] ` : '';
       if (import.meta.hot) {
@@ -9,7 +29,6 @@ class Logger {
           args 
         });
       }
-      // Also log to console for immediate feedback
       console.log(`[${level.toUpperCase()}] ${prefix}${message}`, ...args);
     }
   }
@@ -31,9 +50,7 @@ class Logger {
   }
 
   debug(className: string, message: string, ...args: any[]) {
-    if (import.meta.env.DEV) {
-      this.sendToServer(className, 'debug', message, ...args);
-    }
+    this.sendToServer(className, 'debug', message, ...args);
   }
 }
 
