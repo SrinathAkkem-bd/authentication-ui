@@ -31,7 +31,7 @@ const indexRoute = createRoute({
     try {
       const userData = await useToken();
       logger.info("User is authenticated, redirecting to profile");
-      throw redirect({
+      return redirect({
         to: "/profile",
         search: {
           user: userData.name,
@@ -64,7 +64,7 @@ const ProfileRoute = createRoute({
       };
     } catch (error) {
       logger.error("User is not authenticated, redirecting to login");
-      throw redirect({
+      return redirect({
         to: "/",
       });
     }
