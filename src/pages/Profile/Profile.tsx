@@ -6,20 +6,30 @@ import Axios from "../../lib/Axios";
 import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
 import useToken from "../../lib/useToken";
-import { logger } from "../../utils/logger";
+import { BaseComponent } from "../../utils/logger";
+
+class ProfileComponent extends BaseComponent {
+  constructor() {
+    super('Profile');
+  }
+
+  async handleLogout(navigate: ReturnType<typeof useNavigate>) {
+    try {
+      await Axios.get("/auth/logout");
+      this.log.success("User logged out successfully");
+      navigate({ to: "/" });
+    } catch (error) {
+      this.log.error("Error logging out:", error);
+    }
+  }
+}
+
+const profileComponent = new ProfileComponent();
 
 const Profile = () => {
   const navigate = useNavigate();
 
-  const logout = async () => {
-    try {
-      await Axios.get("/auth/logout");
-      logger.success("User logged out successfully");
-      navigate({ to: "/" });
-    } catch (error) {
-      logger.error("Error logging out:", error);
-    }
-  };
+  const logout = () => profileComponent.handleLogout(navigate);
 
   const {
     isLoading,
@@ -27,22 +37,19 @@ const Profile = () => {
     data: datas,
   } = useQuery({
     queryKey: ["token"],
-    queryFn: async () => {
-      logger.info("Fetching user token");
-      return useToken();
-    },
+    queryFn: useToken,
     staleTime: 300000,
     refetchOnWindowFocus: false,
     retry: false
   });
 
   if (isLoading) {
-    logger.debug("Loading user profile");
+    profileComponent.log.debug("Loading user profile");
     return <Loading />;
   }
 
   if (error) {
-    logger.error("Error fetching session:", error);
+    profileComponent.log.error("Error fetching session:", error);
     return (
       <Layout>
         <p className="text-red-500">An error occurred while loading your profile. Please try logging in again.</p>
@@ -50,7 +57,7 @@ const Profile = () => {
     );
   }
 
-  logger.debug("Profile data loaded:", datas);
+  profileComponent.log.debug("Profile data loaded:", datas);
   return (
     <Layout>
       <div className="flex justify-between items-center max-w-[700px] w-full bg-[#131313] p-4 rounded-[16px]">
