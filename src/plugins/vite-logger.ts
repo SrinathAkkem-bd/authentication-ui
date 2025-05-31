@@ -29,12 +29,9 @@ class TerminalLogger {
 export const terminalLogger = new TerminalLogger();
 
 export function customLogger(): Plugin {
-  let wsInstance: any;
-
   return {
     name: 'vite-custom-logger',
     configureServer(server) {
-      wsInstance = server.ws;
       server.ws.on('custom:log', (data) => {
         const { level, message, args } = data;
         terminalLogger.log(level, message, ...args);
