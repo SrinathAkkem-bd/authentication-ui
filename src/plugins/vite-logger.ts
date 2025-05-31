@@ -32,15 +32,9 @@ export function customLogger(): Plugin {
   return {
     name: 'vite-custom-logger',
     configureServer(server) {
-      // Listen for custom log events from the client
       server.ws.on('custom:log', (data) => {
         const { level, message, args } = data;
         terminalLogger.log(level, message, ...args);
-      });
-
-      server.middlewares.use((req, _, next) => {
-        terminalLogger.log('info', `${req.method} ${req.url}`);
-        next();
       });
     }
   };

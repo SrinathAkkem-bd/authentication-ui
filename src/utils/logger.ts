@@ -1,14 +1,12 @@
 class Logger {
   private sendToServer(level: string, message: string, ...args: any[]) {
     if (import.meta.env.DEV) {
-      // Send log to the Vite dev server through WebSocket
-      const ws = (window as any).__vite_plugin_custom_logger_ws;
-      if (ws) {
-        ws.send('custom:log', { level, message, args });
+      // @ts-ignore
+      if (typeof window !== 'undefined' && window._ws) {
+        // @ts-ignore
+        window._ws.send('custom:log', { level, message, args });
       }
     }
-    // Also log to browser console
-    console.log(`[${level.toUpperCase()}]`, message, ...args);
   }
 
   info(message: string, ...args: any[]) {
