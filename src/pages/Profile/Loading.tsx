@@ -1,13 +1,7 @@
-import Layout from "../../components/Layout/Layout";
+import PageLoader from "../../components/Loading/PageLoader";
 
 const Loading = () => {
-  return (
-    <Layout>
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-gray-200"></div>
-      </div>
-    </Layout>
-  );
+  return <PageLoader message="Loading..." />;
 };
 
 export default Loading;

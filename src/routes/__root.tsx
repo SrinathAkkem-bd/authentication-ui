@@ -5,7 +5,8 @@ import { Suspense } from "react";
 
 import App from "../pages/App";
 import Profile from "../pages/Profile/Profile";
-import Loading from "../pages/Profile/Loading";
+import PageLoader from "../pages/Loading/PageLoader";
+import ErrorBoundary from "../components/Error/ErrorBoundary";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
 import SessionStore from "../lib/sessionStore";
@@ -13,11 +14,17 @@ import SessionStore from "../lib/sessionStore";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error: any) => {
+        // Don't retry on 401 errors
+        if (error?.response?.status === 401) {
+          return false;
+        }
+        return failureCount < 2;
+      },
       staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
-      refetchOnMount: false,
+      refetchOnMount: true,
     },
   },
 });
@@ -26,11 +33,13 @@ export const sessionStore = new SessionStore(queryClient);
 
 export const rootRoute = createRootRoute({
   component: () => (
-    <QueryClientProvider client={queryClient}>
-      <Suspense fallback={<Loading />}>
-        <Outlet />
-      </Suspense>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<PageLoader message="Loading application..." />}>
+          <Outlet />
+        </Suspense>
+      </QueryClientProvider>
+    </ErrorBoundary>
   ),
 });
 
@@ -39,6 +48,8 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: async () => {
     try {
+      logger.info("Route", "Checking authentication status for index route");
+      
       if (sessionStore.hasActiveSession()) {
         const sessionData = sessionStore.getSession()!;
         logger.info("Route", "Active session found, redirecting to profile");
@@ -50,9 +61,11 @@ const indexRoute = createRoute({
         });
       }
 
+      logger.info("Route", "No active session, attempting server authentication");
       const userData = await useToken();
       sessionStore.setSession(userData);
       logger.info("Route", "User authenticated, creating session and redirecting to profile");
+      
       return redirect({
         to: "/profile",
         search: {
@@ -79,12 +92,15 @@ const ProfileRoute = createRoute({
   path: "/profile",
   beforeLoad: async () => {
     try {
+      logger.info("Route", "Checking authentication status for profile route");
+      
       if (sessionStore.hasActiveSession()) {
         const sessionData = sessionStore.getSession()!;
         logger.info("Route", "Using existing session data for profile");
         return { userData: sessionData };
       }
 
+      logger.info("Route", "No active session, attempting server authentication");
       const userData = await useToken();
       sessionStore.setSession(userData);
       logger.info("Route", "Creating new session for profile");

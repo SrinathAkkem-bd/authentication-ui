@@ -1,24 +1,13 @@
-import { useNavigate } from "@tanstack/react-router";
 import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
-import Axios from "../../lib/Axios";
+import LoadingOverlay from "../../components/Loading/LoadingOverlay";
+import ErrorMessage from "../../components/Error/ErrorMessage";
+import { useAuth, useLogout } from "../../hooks/useAuth";
 import { BaseComponent } from "../../utils/logger";
-import { sessionStore } from "../../routes/__root";
 
 class ProfileComponent extends BaseComponent {
   constructor() {
     super('Profile');
-  }
-
-  async handleLogout(navigate: ReturnType<typeof useNavigate>) {
-    try {
-      await Axios.get("/auth/logout");
-      sessionStore.clearSession();
-      this.log.success("User logged out successfully");
-      navigate({ to: "/" });
-    } catch (error) {
-      this.log.error("Error logging out:", error);
-    }
   }
 
   debugProfileData(sessionData: any) {
@@ -33,30 +22,58 @@ class ProfileComponent extends BaseComponent {
 const profileComponent = new ProfileComponent();
 
 const Profile = () => {
-  const navigate = useNavigate();
-  const logout = () => profileComponent.handleLogout(navigate);
+  const { data: userData, isLoading, error, refetch } = useAuth();
+  const logoutMutation = useLogout();
 
-  const sessionData = sessionStore.getSession();
-  profileComponent.debugProfileData(sessionData);
+  profileComponent.debugProfileData(userData);
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="max-w-[700px] w-full">
+          <ErrorMessage 
+            message="Failed to load profile data. Please try again."
+            onRetry={() => refetch()}
+          />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="flex justify-between items-center max-w-[700px] w-full bg-[#131313] p-4 rounded-[16px]">
-        <div className="flex flex-col gap-[20px]">
-          <h1 className="text-[24px] text-gray-100">Profile</h1>
+      <LoadingOverlay 
+        isLoading={isLoading} 
+        message="Loading profile..."
+        overlay={false}
+      >
+        <div className="flex justify-between items-center max-w-[700px] w-full bg-[#131313] p-4 rounded-[16px]">
+          <div className="flex flex-col gap-[20px] w-full">
+            <h1 className="text-[24px] text-gray-100">Profile</h1>
 
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-[20px] text-gray-100">Name:</h2>
-              <p className="text-gray-300">{sessionData?.name}</p>
-            </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[20px] text-gray-100">Name:</h2>
+                <p className="text-gray-300">{userData?.name || 'Loading...'}</p>
+              </div>
 
-            <div className="grid gap-3">
-              <Button onClick={logout}>Logout</Button>
+              <div className="grid gap-3">
+                <Button 
+                  onClick={handleLogout}
+                  loading={logoutMutation.isPending}
+                  disabled={logoutMutation.isPending}
+                >
+                  {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </LoadingOverlay>
     </Layout>
   );
 };
