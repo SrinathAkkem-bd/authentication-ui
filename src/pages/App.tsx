@@ -6,7 +6,7 @@ import PageLoader from "../components/Loading/PageLoader";
 const App = () => {
   const { isLoading, data: userData } = useAuth();
 
-  // Show loading state while checking authentication
+  // Show loading state only briefly while checking authentication
   if (isLoading) {
     return <PageLoader message="Authenticating..." />;
   }

@@ -15,7 +15,7 @@ interface State {
 
 class NetworkErrorBoundary extends Component<Props, State> {
   private retryCount = 0;
-  private maxRetries = 5;
+  private maxRetries = 2; // Reduced to 2 retries
   private retryTimer: number | null = null;
 
   constructor(props: Props) {
@@ -47,18 +47,21 @@ class NetworkErrorBoundary extends Component<Props, State> {
     
     this.setState({ errorInfo });
 
-    // Auto-retry silently for network errors
+    // Auto-retry silently for network errors (limited attempts)
     if (this.state.isNetworkError && this.retryCount < this.maxRetries) {
       this.retryCount++;
       logger.info('NetworkErrorBoundary', `Silent auto-retry attempt ${this.retryCount}/${this.maxRetries}`);
       
-      const delay = Math.min(1000 * Math.pow(2, this.retryCount), 10000); // Max 10 seconds
+      const delay = 1000 * (this.retryCount + 1); // Simple linear delay: 2s, 3s
       this.retryTimer = window.setTimeout(() => {
         this.setState({ hasError: false, error: null, errorInfo: null });
       }, delay);
-    } else if (this.retryCount >= this.maxRetries) {
-      // After max retries, just show loading indefinitely
-      logger.warn('NetworkErrorBoundary', 'Max retries reached, showing loading state');
+    } else {
+      // After max retries, show the children (main app) instead of loading
+      logger.warn('NetworkErrorBoundary', 'Max retries reached, showing main app');
+      setTimeout(() => {
+        this.setState({ hasError: false, error: null, errorInfo: null });
+      }, 1000);
     }
   }
 
@@ -69,11 +72,12 @@ class NetworkErrorBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (this.state.hasError) {
-      // Always show loading state instead of error messages
+    if (this.state.hasError && this.retryCount < this.maxRetries) {
+      // Show loading only during retry attempts
       return <PageLoader message="Loading..." />;
     }
 
+    // Always show children after retries are exhausted
     return this.props.children;
   }
 }

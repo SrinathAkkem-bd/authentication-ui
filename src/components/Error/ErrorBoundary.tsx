@@ -12,6 +12,8 @@ interface State {
 
 class ErrorBoundary extends Component<Props, State> {
   private retryTimer: number | null = null;
+  private retryCount = 0;
+  private maxRetries = 2; // Limited to 2 retries
 
   constructor(props: Props) {
     super(props);
@@ -27,10 +29,19 @@ class ErrorBoundary extends Component<Props, State> {
     logger.error('ErrorBoundary', 'Application error caught:', error.message);
     logger.debug('ErrorBoundary', 'Error details:', { error, errorInfo });
     
-    // Attempt to recover silently after a short delay
-    this.retryTimer = window.setTimeout(() => {
-      this.setState({ hasError: false });
-    }, 2000);
+    // Attempt to recover silently with limited retries
+    if (this.retryCount < this.maxRetries) {
+      this.retryCount++;
+      this.retryTimer = window.setTimeout(() => {
+        this.setState({ hasError: false });
+      }, 1000 * this.retryCount); // 1s, 2s delays
+    } else {
+      // After max retries, show the app anyway
+      logger.warn('ErrorBoundary', 'Max retries reached, showing app');
+      this.retryTimer = window.setTimeout(() => {
+        this.setState({ hasError: false });
+      }, 2000);
+    }
   }
 
   componentWillUnmount() {
@@ -40,8 +51,8 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (this.state.hasError) {
-      // Show loading instead of error message
+    if (this.state.hasError && this.retryCount <= this.maxRetries) {
+      // Show loading briefly during recovery
       return <PageLoader message="Loading..." />;
     }
 

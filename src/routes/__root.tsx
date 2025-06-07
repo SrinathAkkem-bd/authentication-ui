@@ -25,23 +25,18 @@ const queryClient = new QueryClient({
           return false;
         }
         
-        // More aggressive retries for network errors
-        if (error?.code === 'NETWORK_ERROR' || error?.name === 'TypeError') {
-          return failureCount < 10;
-        }
-        
-        return failureCount < 3;
+        // Limited retries - max 2 attempts
+        return failureCount < 2;
       },
       retryDelay: (attemptIndex) => {
-        // Exponential backoff with jitter
-        const baseDelay = Math.min(1000 * Math.pow(2, attemptIndex), 30000);
-        const jitter = Math.random() * 1000;
-        return baseDelay + jitter;
+        // Quick retry with minimal delay
+        return Math.min(1000 * (attemptIndex + 1), 3000);
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       refetchOnMount: true,
+      refetchInterval: false, // Disable automatic refetching
       // Silent error handling - never throw errors to UI
       throwOnError: false,
     },
@@ -53,9 +48,9 @@ const queryClient = new QueryClient({
         if (error?.response?.status === 401) {
           return false;
         }
-        return failureCount < 2;
+        return failureCount < 1; // Only 1 retry for mutations
       },
-      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
+      retryDelay: () => 1000, // 1 second delay for mutation retries
     },
   },
 });

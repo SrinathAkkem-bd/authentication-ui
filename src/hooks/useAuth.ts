@@ -42,30 +42,18 @@ class AuthHook extends BaseComponent {
           return false;
         }
         
-        // For network errors, retry more aggressively
-        if (error?.code === 'NETWORK_ERROR' || error?.name === 'TypeError') {
-          return failureCount < 10; // More retries for network issues
-        }
-        
-        return failureCount < 3;
+        // Limited retries - max 2 attempts
+        return failureCount < 2;
       },
       retryDelay: (attemptIndex) => {
-        // Exponential backoff with jitter
-        const baseDelay = Math.min(1000 * Math.pow(2, attemptIndex), 30000);
-        const jitter = Math.random() * 1000;
-        return baseDelay + jitter;
+        // Quick retry delay - max 3 seconds
+        return Math.min(1000 * (attemptIndex + 1), 3000);
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       refetchOnMount: true,
-      refetchInterval: (data, query) => {
-        // Only refetch if we have data and no errors
-        if (data && !query.state.error) {
-          return 5 * 60 * 1000; // 5 minutes
-        }
-        return false;
-      },
+      refetchInterval: false, // Disable automatic refetching
       // Silent error handling - never throw errors to UI
       throwOnError: false,
     });
