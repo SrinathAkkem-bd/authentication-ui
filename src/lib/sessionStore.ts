@@ -7,6 +7,7 @@ export type SessionData = {
   data?: Record<string, any>;
   lastModified?: number;
   sessionId?: string;
+  lastValidated?: number;
 };
 
 class SessionStore extends BaseComponent {
@@ -16,12 +17,14 @@ class SessionStore extends BaseComponent {
   private readonly ENCRYPTION_KEY: string;
   private readonly SESSION_TIMEOUT: number;
   private readonly SESSION_RENEWAL_THRESHOLD: number;
+  private readonly VALIDATION_INTERVAL: number = 5 * 60 * 1000; // 5 minutes instead of 30 seconds
   private sessionTimer: number | null = null;
   private renewalTimer: number | null = null;
-  private heartbeatTimer: number | null = null;
+  private validationTimer: number | null = null;
   private isRenewing = false;
   private retryCount = 0;
-  private readonly MAX_RETRIES = 3;
+  private readonly MAX_RETRIES = 2; // Reduced from 3
+  private lastValidationTime = 0;
 
   constructor(queryClient: QueryClient) {
     super('SessionStore');
@@ -42,6 +45,7 @@ class SessionStore extends BaseComponent {
     
     this.log.debug(`Session timeout set to ${this.SESSION_TIMEOUT}ms`);
     this.log.debug(`Session renewal threshold set to ${this.SESSION_RENEWAL_THRESHOLD}ms`);
+    this.log.debug(`Validation interval set to ${this.VALIDATION_INTERVAL}ms`);
 
     // Initialize session recovery on startup
     this.initializeSessionRecovery();
@@ -107,6 +111,13 @@ class SessionStore extends BaseComponent {
     return timeElapsed < this.SESSION_TIMEOUT;
   }
 
+  private needsValidation(sessionData: SessionData): boolean {
+    if (!sessionData.lastValidated) return true;
+    
+    const timeSinceValidation = Date.now() - sessionData.lastValidated;
+    return timeSinceValidation > this.VALIDATION_INTERVAL;
+  }
+
   private saveToLocalStorage(sessionData: SessionData) {
     try {
       const encryptedData = this.encrypt(sessionData);
@@ -132,21 +143,27 @@ class SessionStore extends BaseComponent {
   }
 
   private handleOnline() {
-    this.log.info('Connection restored, validating session');
-    this.validateSessionWithServer();
+    this.log.info('Connection restored');
+    // Only validate if we haven't validated recently
+    const session = this.getSession();
+    if (session && this.needsValidation(session)) {
+      this.validateSessionWithServer();
+    }
   }
 
   private handleOffline() {
     this.log.warn('Connection lost, session validation paused');
-    this.stopHeartbeat();
+    this.stopValidationTimer();
   }
 
   private handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
-      this.log.debug('Tab became visible, checking session');
-      this.validateSessionWithServer();
-    } else {
-      this.log.debug('Tab became hidden');
+      this.log.debug('Tab became visible');
+      // Only validate if we haven't validated recently
+      const session = this.getSession();
+      if (session && this.needsValidation(session)) {
+        this.validateSessionWithServer();
+      }
     }
   }
 
@@ -161,7 +178,16 @@ class SessionStore extends BaseComponent {
   private async validateSessionWithServer() {
     if (this.isRenewing || !navigator.onLine) return;
 
+    // Prevent duplicate validation calls
+    const now = Date.now();
+    if (now - this.lastValidationTime < 10000) { // 10 second cooldown
+      this.log.debug('Skipping validation - too recent');
+      return;
+    }
+    this.lastValidationTime = now;
+
     try {
+      this.log.debug('Validating session with server');
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/validate`, {
         credentials: 'include',
         signal: AbortSignal.timeout(5000) // 5 second timeout
@@ -169,7 +195,15 @@ class SessionStore extends BaseComponent {
 
       if (response.ok) {
         this.retryCount = 0;
-        this.startHeartbeat();
+        // Update last validated time
+        const session = this.getSession();
+        if (session) {
+          this.updateSession({
+            ...session,
+            lastValidated: Date.now()
+          });
+        }
+        this.startValidationTimer();
       } else if (response.status === 401) {
         this.log.warn('Session invalid on server');
         this.handleSessionExpired();
@@ -190,7 +224,7 @@ class SessionStore extends BaseComponent {
       this.handleSessionExpired();
     } else {
       // Retry with exponential backoff
-      const delay = Math.pow(2, this.retryCount) * 1000;
+      const delay = Math.pow(2, this.retryCount) * 2000; // 2s, 4s
       setTimeout(() => this.validateSessionWithServer(), delay);
     }
   }
@@ -210,21 +244,24 @@ class SessionStore extends BaseComponent {
     }, 100);
   }
 
-  private startHeartbeat() {
-    this.stopHeartbeat();
+  private startValidationTimer() {
+    this.stopValidationTimer();
     
-    // Send heartbeat every 30 seconds when online
-    this.heartbeatTimer = window.setInterval(() => {
+    // Validate session every 5 minutes instead of 30 seconds
+    this.validationTimer = window.setInterval(() => {
       if (navigator.onLine && this.hasActiveSession()) {
-        this.validateSessionWithServer();
+        const session = this.getSession();
+        if (session && this.needsValidation(session)) {
+          this.validateSessionWithServer();
+        }
       }
-    }, 30000);
+    }, this.VALIDATION_INTERVAL);
   }
 
-  private stopHeartbeat() {
-    if (this.heartbeatTimer) {
-      window.clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
+  private stopValidationTimer() {
+    if (this.validationTimer) {
+      window.clearInterval(this.validationTimer);
+      this.validationTimer = null;
     }
   }
 
@@ -251,6 +288,7 @@ class SessionStore extends BaseComponent {
         const renewedData = await response.json();
         // Update session with new data if provided, otherwise just update timestamp
         const updatedSession = renewedData ? { ...currentSession, ...renewedData } : currentSession;
+        updatedSession.lastValidated = Date.now(); // Mark as validated
         this.updateSession(updatedSession);
         this.log.success('Session renewed successfully');
         this.retryCount = 0;
@@ -276,7 +314,7 @@ class SessionStore extends BaseComponent {
       this.handleSessionExpired();
     } else {
       // Retry renewal with exponential backoff
-      const delay = Math.pow(2, this.retryCount) * 1000;
+      const delay = Math.pow(2, this.retryCount) * 2000; // 2s, 4s
       setTimeout(() => this.renewSession(), delay);
     }
   }
@@ -296,8 +334,8 @@ class SessionStore extends BaseComponent {
       this.renewSession();
     }, timeUntilRenewal);
 
-    // Start heartbeat
-    this.startHeartbeat();
+    // Start validation timer (much less frequent)
+    this.startValidationTimer();
   }
 
   private clearTimers() {
@@ -309,7 +347,7 @@ class SessionStore extends BaseComponent {
       window.clearTimeout(this.renewalTimer);
       this.renewalTimer = null;
     }
-    this.stopHeartbeat();
+    this.stopValidationTimer();
   }
 
   private updateSession(sessionData: SessionData) {
@@ -345,6 +383,7 @@ class SessionStore extends BaseComponent {
         ...data,
         data: data.data || {},
         lastModified: Date.now(),
+        lastValidated: Date.now(), // Mark as validated when setting
         sessionId: CryptoJS.lib.WordArray.random(128/8).toString()
       };
 
@@ -391,7 +430,7 @@ class SessionStore extends BaseComponent {
         return undefined;
       }
 
-      // Check if session is approaching expiration
+      // Only trigger renewal if session is approaching expiration AND we're not already renewing
       if (timeElapsed > (this.SESSION_TIMEOUT - this.SESSION_RENEWAL_THRESHOLD) && !this.isRenewing) {
         this.renewSession();
       }
@@ -483,6 +522,7 @@ class SessionStore extends BaseComponent {
     localStorage.removeItem(this.LOCAL_STORAGE_KEY);
     this.retryCount = 0;
     this.isRenewing = false;
+    this.lastValidationTime = 0;
     this.log.debug('Session cleared completely');
   }
 
@@ -495,7 +535,7 @@ class SessionStore extends BaseComponent {
     }
   }
 
-  // Force session refresh from server
+  // Force session refresh from server - only when explicitly needed
   async refreshSession(): Promise<boolean> {
     try {
       this.log.info('Forcing session refresh from server');
@@ -507,6 +547,7 @@ class SessionStore extends BaseComponent {
 
       if (response.ok) {
         const userData = await response.json();
+        userData.lastValidated = Date.now(); // Mark as validated
         this.setSession(userData);
         this.log.success('Session refreshed from server');
         return true;
@@ -531,8 +572,10 @@ class SessionStore extends BaseComponent {
     return {
       sessionId: session.sessionId,
       lastModified: new Date(session.lastModified || 0).toISOString(),
+      lastValidated: session.lastValidated ? new Date(session.lastValidated).toISOString() : 'Never',
       timeRemaining: Math.max(0, this.SESSION_TIMEOUT - (Date.now() - (session.lastModified || 0))),
       isValid: this.isSessionValid(session),
+      needsValidation: this.needsValidation(session),
       retryCount: this.retryCount,
       isRenewing: this.isRenewing
     };

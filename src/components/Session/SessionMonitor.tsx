@@ -25,7 +25,7 @@ class SessionMonitorComponent extends BaseComponent {
         setIsOnline(false);
       };
 
-      // Monitor session info in development
+      // Monitor session info in development - less frequently
       const updateSessionInfo = () => {
         if (import.meta.env.DEV) {
           setSessionInfo(sessionStore.getSessionInfo());
@@ -36,9 +36,9 @@ class SessionMonitorComponent extends BaseComponent {
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
 
-      // Update session info periodically in development
+      // Update session info less frequently in development (every 10 seconds instead of 5)
       const sessionInfoInterval = import.meta.env.DEV 
-        ? setInterval(updateSessionInfo, 5000)
+        ? setInterval(updateSessionInfo, 10000)
         : null;
 
       // Initial session info update
@@ -92,6 +92,23 @@ const SessionMonitor = () => {
               <span>Time Left:</span>
               <span className="text-blue-400">
                 {Math.floor(sessionInfo.timeRemaining / 1000 / 60)}m
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Last Validated:</span>
+              <span className="text-gray-400 text-xs">
+                {sessionInfo.lastValidated !== 'Never' 
+                  ? new Date(sessionInfo.lastValidated).toLocaleTimeString()
+                  : 'Never'
+                }
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Needs Validation:</span>
+              <span className={sessionInfo.needsValidation ? 'text-yellow-400' : 'text-green-400'}>
+                {sessionInfo.needsValidation ? 'Yes' : 'No'}
               </span>
             </div>
             

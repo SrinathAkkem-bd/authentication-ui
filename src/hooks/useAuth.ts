@@ -15,18 +15,19 @@ class AuthHook extends BaseComponent {
     return useQuery({
       queryKey: ['auth', 'user'],
       queryFn: async (): Promise<UserData> => {
-        this.log.info('Fetching user authentication data');
+        this.log.info('Checking authentication status');
         
-        // Check if we have an active session first
+        // First check if we have a valid session
         if (sessionStore.hasActiveSession()) {
           const sessionData = sessionStore.getSession();
           if (sessionData) {
-            this.log.debug('Using existing session data');
+            this.log.debug('Using existing valid session data');
             return sessionData;
           }
         }
 
-        // If no session, fetch from server
+        // Only fetch from server if no valid session exists
+        this.log.info('No valid session found, fetching from server');
         const userData = await useToken();
         sessionStore.setSession(userData);
         this.log.success('User authenticated and session created');
@@ -42,18 +43,15 @@ class AuthHook extends BaseComponent {
           return false;
         }
         
-        // Limited retries - max 2 attempts
-        return failureCount < 2;
+        // Very limited retries - max 1 attempt
+        return failureCount < 1;
       },
-      retryDelay: (attemptIndex) => {
-        // Quick retry delay - max 3 seconds
-        return Math.min(1000 * (attemptIndex + 1), 3000);
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: true,
+      retryDelay: () => 2000, // 2 second delay
+      staleTime: 10 * 60 * 1000, // 10 minutes - increased from 5
+      refetchOnWindowFocus: false, // Disabled to reduce calls
       refetchOnReconnect: true,
-      refetchOnMount: true,
-      refetchInterval: false, // Disable automatic refetching
+      refetchOnMount: false, // Disabled - rely on session store
+      refetchInterval: false, // Disabled
       // Silent error handling - never throw errors to UI
       throwOnError: false,
     });
@@ -96,7 +94,7 @@ class AuthHook extends BaseComponent {
 
     return useMutation({
       mutationFn: async () => {
-        this.log.info('Refreshing session from server');
+        this.log.info('Manually refreshing session from server');
         return await sessionStore.refreshSession();
       },
       onSuccess: (success) => {
@@ -146,7 +144,7 @@ export const useSessionRefresh = () => {
   return authHook.createSessionRefreshMutation();
 };
 
-// Hook for session monitoring
+// Hook for session monitoring - simplified
 export const useSessionMonitor = () => {
   const queryClient = useQueryClient();
 

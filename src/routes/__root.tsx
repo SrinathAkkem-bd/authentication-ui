@@ -25,18 +25,15 @@ const queryClient = new QueryClient({
           return false;
         }
         
-        // Limited retries - max 2 attempts
-        return failureCount < 2;
+        // Very limited retries - max 1 attempt
+        return failureCount < 1;
       },
-      retryDelay: (attemptIndex) => {
-        // Quick retry with minimal delay
-        return Math.min(1000 * (attemptIndex + 1), 3000);
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: true,
+      retryDelay: () => 2000, // 2 second delay
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: false, // Disabled to reduce calls
       refetchOnReconnect: true,
-      refetchOnMount: true,
-      refetchInterval: false, // Disable automatic refetching
+      refetchOnMount: false, // Disabled - rely on session store
+      refetchInterval: false, // Disabled
       // Silent error handling - never throw errors to UI
       throwOnError: false,
     },
@@ -50,7 +47,7 @@ const queryClient = new QueryClient({
         }
         return failureCount < 1; // Only 1 retry for mutations
       },
-      retryDelay: () => 1000, // 1 second delay for mutation retries
+      retryDelay: () => 2000, // 2 second delay for mutation retries
     },
   },
 });
@@ -79,6 +76,7 @@ const indexRoute = createRoute({
     try {
       logger.info("Route", "Checking authentication status for index route");
       
+      // First check session store - no API call needed
       if (sessionStore.hasActiveSession()) {
         const sessionData = sessionStore.getSession()!;
         logger.info("Route", "Active session found, redirecting to profile");
@@ -90,6 +88,7 @@ const indexRoute = createRoute({
         });
       }
 
+      // Only make API call if no valid session exists
       logger.info("Route", "No active session, attempting server authentication");
       const userData = await useToken();
       sessionStore.setSession(userData);
@@ -125,12 +124,14 @@ const ProfileRoute = createRoute({
     try {
       logger.info("Route", "Checking authentication status for profile route");
       
+      // First check session store - no API call needed
       if (sessionStore.hasActiveSession()) {
         const sessionData = sessionStore.getSession()!;
         logger.info("Route", "Using existing session data for profile");
         return { userData: sessionData };
       }
 
+      // Only make API call if no valid session exists
       logger.info("Route", "No active session, attempting server authentication");
       const userData = await useToken();
       sessionStore.setSession(userData);
