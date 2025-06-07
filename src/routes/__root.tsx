@@ -7,6 +7,8 @@ import App from "../pages/App";
 import Profile from "../pages/Profile/Profile";
 import PageLoader from "../components/Loading/PageLoader";
 import ErrorBoundary from "../components/Error/ErrorBoundary";
+import NetworkErrorBoundary from "../components/Error/NetworkErrorBoundary";
+import SessionMonitor from "../components/Session/SessionMonitor";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
 import SessionStore from "../lib/sessionStore";
@@ -22,18 +24,33 @@ const queryClient = new QueryClient({
         if (error?.response?.status === 401) {
           return false;
         }
+        
+        // Don't retry on network errors beyond 3 attempts
+        if (error?.code === 'NETWORK_ERROR' || error?.name === 'TypeError') {
+          return failureCount < 2;
+        }
+        
         return failureCount < 2;
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       refetchOnMount: true,
+      // Retry delay with exponential backoff
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       // Silent error handling - never throw errors to UI
       throwOnError: false,
     },
     mutations: {
       // Silent error handling for mutations too
       throwOnError: false,
+      retry: (failureCount, error: any) => {
+        // Don't retry mutations on 401 errors
+        if (error?.response?.status === 401) {
+          return false;
+        }
+        return failureCount < 1;
+      },
     },
   },
 });
@@ -43,11 +60,14 @@ export const sessionStore = new SessionStore(queryClient);
 export const rootRoute = createRootRoute({
   component: () => (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <Suspense fallback={<PageLoader message="Loading application..." />}>
-          <Outlet />
-        </Suspense>
-      </QueryClientProvider>
+      <NetworkErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <Suspense fallback={<PageLoader message="Loading application..." />}>
+            <Outlet />
+            <SessionMonitor />
+          </Suspense>
+        </QueryClientProvider>
+      </NetworkErrorBoundary>
     </ErrorBoundary>
   ),
 });
@@ -89,6 +109,8 @@ const indexRoute = createRoute({
         throw error; // Allow redirects to work
       } else {
         logger.error("Route", `Authentication check failed: ${error}`);
+        // Clear any corrupted session data
+        sessionStore.clearSession();
       }
       return {}; // Always return successfully to show login page
     }

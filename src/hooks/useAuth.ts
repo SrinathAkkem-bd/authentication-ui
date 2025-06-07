@@ -4,6 +4,7 @@ import { sessionStore } from '../routes/__root';
 import useToken, { UserData } from '../lib/useToken';
 import Axios from '../lib/Axios';
 import { BaseComponent } from '../utils/logger';
+import { useEffect } from 'react';
 
 class AuthHook extends BaseComponent {
   constructor() {
@@ -45,6 +46,13 @@ class AuthHook extends BaseComponent {
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
+      refetchInterval: (data, query) => {
+        // Only refetch if we have data and no errors
+        if (data && !query.state.error) {
+          return 5 * 60 * 1000; // 5 minutes
+        }
+        return false;
+      },
       // Silent error handling - never throw errors to UI
       throwOnError: false,
     });
@@ -76,14 +84,79 @@ class AuthHook extends BaseComponent {
       throwOnError: false,
     });
   }
+
+  createSessionRefreshMutation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+      mutationFn: async () => {
+        this.log.info('Refreshing session from server');
+        return await sessionStore.refreshSession();
+      },
+      onSuccess: (success) => {
+        if (success) {
+          // Invalidate auth query to refetch with new session data
+          queryClient.invalidateQueries({ queryKey: ['auth', 'user'] });
+          this.log.success('Session refreshed successfully');
+        }
+      },
+      onError: (error) => {
+        this.log.error('Failed to refresh session:', error);
+      },
+      throwOnError: false,
+    });
+  }
 }
 
 const authHook = new AuthHook();
 
 export const useAuth = () => {
-  return authHook.createAuthQuery();
+  const query = authHook.createAuthQuery();
+  
+  // Monitor for session changes and errors
+  useEffect(() => {
+    if (query.error) {
+      const error = query.error as any;
+      if (error?.response?.status === 401) {
+        // Session expired, clear and redirect
+        sessionStore.clearSession();
+        window.location.href = '/';
+      }
+    }
+  }, [query.error]);
+
+  return query;
 };
 
 export const useLogout = () => {
   return authHook.createLogoutMutation();
+};
+
+export const useSessionRefresh = () => {
+  return authHook.createSessionRefreshMutation();
+};
+
+// Hook for session monitoring
+export const useSessionMonitor = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      queryClient.clear();
+      window.location.href = '/';
+    };
+
+    const handleSessionRestored = () => {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'user'] });
+    };
+
+    // Listen for custom session events
+    window.addEventListener('session:expired', handleSessionExpired);
+    window.addEventListener('session:restored', handleSessionRestored);
+
+    return () => {
+      window.removeEventListener('session:expired', handleSessionExpired);
+      window.removeEventListener('session:restored', handleSessionRestored);
+    };
+  }, [queryClient]);
 };
