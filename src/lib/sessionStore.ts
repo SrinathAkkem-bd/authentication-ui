@@ -23,7 +23,7 @@ class SessionStore extends BaseComponent {
   private validationTimer: number | null = null;
   private isRenewing = false;
   private retryCount = 0;
-  private readonly MAX_RETRIES = 2;
+  private readonly MAX_RETRIES = 2; // Reduced to 2
   private lastValidationTime = 0;
 
   constructor(queryClient: QueryClient) {

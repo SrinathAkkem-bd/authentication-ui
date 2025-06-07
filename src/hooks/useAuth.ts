@@ -43,8 +43,8 @@ class AuthHook extends BaseComponent {
           return false;
         }
         
-        // Very limited retries - max 1 attempt
-        return failureCount < 1;
+        // Reduced retries - max 2 attempts
+        return failureCount < 2;
       },
       retryDelay: () => 2000, // 2 second delay
       staleTime: 10 * 60 * 1000, // 10 minutes - increased from 5
@@ -111,6 +111,51 @@ class AuthHook extends BaseComponent {
       throwOnError: false,
     });
   }
+
+  createFetchOrgQuery() {
+    return useQuery({
+      queryKey: ['org', 'data'],
+      queryFn: async () => {
+        this.log.info('Fetching organization data');
+        
+        // Check if we have cached org data first
+        const cachedOrgData = sessionStore.read('orgData');
+        if (cachedOrgData) {
+          this.log.debug('Using cached organization data');
+          return cachedOrgData;
+        }
+
+        // Fetch from server if no cached data
+        const response = await Axios.get('/org/fetch');
+        const orgData = response.data;
+        
+        // Store in session for future use
+        sessionStore.create('orgData', orgData);
+        this.log.success('Organization data fetched and cached');
+        
+        return orgData;
+      },
+      retry: (failureCount, error: any) => {
+        this.log.error(`Fetch org attempt ${failureCount + 1} failed:`, error?.message);
+        
+        // Don't retry on 401 errors
+        if (error?.response?.status === 401) {
+          this.log.info('Unauthorized for org data (401), stopping retries');
+          return false;
+        }
+        
+        // Reduced retries - max 2 attempts
+        return failureCount < 2;
+      },
+      retryDelay: () => 2000,
+      staleTime: 15 * 60 * 1000, // 15 minutes for org data
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      refetchOnMount: false,
+      throwOnError: false,
+      enabled: false, // Only fetch when explicitly called
+    });
+  }
 }
 
 const authHook = new AuthHook();
@@ -142,6 +187,10 @@ export const useLogout = () => {
 
 export const useSessionRefresh = () => {
   return authHook.createSessionRefreshMutation();
+};
+
+export const useFetchOrg = () => {
+  return authHook.createFetchOrgQuery();
 };
 
 // Hook for session monitoring - simplified

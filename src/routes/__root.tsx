@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense } from "react";
 
 import App from "../pages/App";
-import Profile from "../pages/Profile/Profile";
+import Wizard from "../pages/Wizard/Wizard";
+import InstallOrg from "../pages/InstallOrg/InstallOrg";
 import PageLoader from "../components/Loading/PageLoader";
 import ErrorBoundary from "../components/Error/ErrorBoundary";
 import NetworkErrorBoundary from "../components/Error/NetworkErrorBoundary";
@@ -12,6 +13,7 @@ import SessionMonitor from "../components/Session/SessionMonitor";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
 import SessionStore from "../lib/sessionStore";
+import Axios from "../lib/Axios";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,8 +27,8 @@ const queryClient = new QueryClient({
           return false;
         }
         
-        // Very limited retries - max 1 attempt
-        return failureCount < 1;
+        // Reduced retries - max 2 attempts
+        return failureCount < 2;
       },
       retryDelay: () => 2000, // 2 second delay
       staleTime: 10 * 60 * 1000, // 10 minutes
@@ -45,7 +47,7 @@ const queryClient = new QueryClient({
         if (error?.response?.status === 401) {
           return false;
         }
-        return failureCount < 1; // Only 1 retry for mutations
+        return failureCount < 2; // Reduced to 2 retries for mutations
       },
       retryDelay: () => 2000, // 2 second delay for mutation retries
     },
@@ -79,23 +81,33 @@ const indexRoute = createRoute({
       // First check session store - no API call needed
       if (sessionStore.hasActiveSession()) {
         const sessionData = sessionStore.getSession()!;
-        logger.info("Route", "Active session found, redirecting to profile");
-        return redirect({
-          to: "/profile",
-          search: {
-            user: sessionData.name,
-          },
-        });
+        logger.info("Route", "Active session found, checking organization status");
+        
+        // Check if we have cached org data
+        const cachedOrgData = sessionStore.read('orgData');
+        if (cachedOrgData) {
+          if (cachedOrgData.total > 0) {
+            logger.info("Route", "Cached org data found, redirecting to wizard");
+            return redirect({ to: "/wizard", search: { user: sessionData.name } });
+          } else {
+            logger.info("Route", "No cached org data, redirecting to install org");
+            return redirect({ to: "/installOrg", search: { user: sessionData.name } });
+          }
+        } else {
+          // No cached org data, redirect to install org to fetch it
+          logger.info("Route", "No cached org data, redirecting to install org");
+          return redirect({ to: "/installOrg", search: { user: sessionData.name } });
+        }
       }
 
       // Only make API call if no valid session exists
       logger.info("Route", "No active session, attempting server authentication");
       const userData = await useToken();
       sessionStore.setSession(userData);
-      logger.info("Route", "User authenticated, creating session and redirecting to profile");
+      logger.info("Route", "User authenticated, redirecting to install org to check organization");
       
       return redirect({
-        to: "/profile",
+        to: "/installOrg",
         search: {
           user: userData.name,
         },
@@ -117,17 +129,17 @@ const indexRoute = createRoute({
   component: App,
 });
 
-const ProfileRoute = createRoute({
+const InstallOrgRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/profile",
+  path: "/installOrg",
   beforeLoad: async () => {
     try {
-      logger.info("Route", "Checking authentication status for profile route");
+      logger.info("Route", "Checking authentication status for install org route");
       
       // First check session store - no API call needed
       if (sessionStore.hasActiveSession()) {
         const sessionData = sessionStore.getSession()!;
-        logger.info("Route", "Using existing session data for profile");
+        logger.info("Route", "Using existing session data for install org");
         return { userData: sessionData };
       }
 
@@ -135,22 +147,63 @@ const ProfileRoute = createRoute({
       logger.info("Route", "No active session, attempting server authentication");
       const userData = await useToken();
       sessionStore.setSession(userData);
-      logger.info("Route", "Creating new session for profile");
+      logger.info("Route", "Creating new session for install org");
       return {
         userData,
       };
     } catch (error) {
       // Handle errors silently - redirect to login without showing error
-      logger.error("Route", "Authentication failed for profile, redirecting to login");
+      logger.error("Route", "Authentication failed for install org, redirecting to login");
       sessionStore.clearSession();
       return redirect({
         to: "/",
       });
     }
   },
-  component: Profile,
+  component: InstallOrg,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, ProfileRoute]);
+const WizardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/wizard",
+  beforeLoad: async () => {
+    try {
+      logger.info("Route", "Checking authentication status for wizard route");
+      
+      // First check session store - no API call needed
+      if (sessionStore.hasActiveSession()) {
+        const sessionData = sessionStore.getSession()!;
+        logger.info("Route", "Using existing session data for wizard");
+        
+        // Check if we have org data and it's valid
+        const cachedOrgData = sessionStore.read('orgData');
+        if (cachedOrgData && cachedOrgData.total > 0) {
+          logger.info("Route", "Valid org data found, proceeding to wizard");
+          return { userData: sessionData };
+        } else {
+          logger.info("Route", "No valid org data, redirecting to install org");
+          return redirect({ to: "/installOrg" });
+        }
+      }
+
+      // Only make API call if no valid session exists
+      logger.info("Route", "No active session, attempting server authentication");
+      const userData = await useToken();
+      sessionStore.setSession(userData);
+      logger.info("Route", "Creating new session, redirecting to install org to check organization");
+      return redirect({ to: "/installOrg" });
+    } catch (error) {
+      // Handle errors silently - redirect to login without showing error
+      logger.error("Route", "Authentication failed for wizard, redirecting to login");
+      sessionStore.clearSession();
+      return redirect({
+        to: "/",
+      });
+    }
+  },
+  component: Wizard,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, InstallOrgRoute, WizardRoute]);
 
 export default routeTree;

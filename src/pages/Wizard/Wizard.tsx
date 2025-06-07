@@ -5,28 +5,28 @@ import { useAuth, useLogout, useSessionRefresh } from "../../hooks/useAuth";
 import { sessionStore } from "../../routes/__root";
 import { BaseComponent } from "../../utils/logger";
 
-class ProfileComponent extends BaseComponent {
+class WizardComponent extends BaseComponent {
   constructor() {
-    super('Profile');
+    super('Wizard');
   }
 
-  debugProfileData(sessionData: any) {
+  debugWizardData(sessionData: any) {
     if (sessionData) {
-      this.log.debug("Profile Data:", sessionData);
+      this.log.debug("Wizard Data:", sessionData);
     } else {
       this.log.warn("No session data found");
     }
   }
 }
 
-const profileComponent = new ProfileComponent();
+const wizardComponent = new WizardComponent();
 
-const Profile = () => {
+const Wizard = () => {
   const { data: userData, isLoading } = useAuth();
   const logoutMutation = useLogout();
   const refreshMutation = useSessionRefresh();
 
-  profileComponent.debugProfileData(userData);
+  wizardComponent.debugWizardData(userData);
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -42,13 +42,13 @@ const Profile = () => {
     <Layout>
       <LoadingOverlay 
         isLoading={isLoading} 
-        message="Loading profile..."
+        message="Loading wizard..."
         overlay={false}
       >
         <div className="flex justify-between items-center max-w-[700px] w-full bg-[#131313] p-4 rounded-[16px]">
           <div className="flex flex-col gap-[20px] w-full">
             <div className="flex justify-between items-center">
-              <h1 className="text-[24px] text-gray-100">Profile</h1>
+              <h1 className="text-[24px] text-gray-100">Wizard</h1>
               {/* Only show offline indicator, no error messages */}
               {!navigator.onLine && (
                 <div className="bg-gray-600 text-white px-3 py-1 rounded text-sm">
@@ -103,4 +103,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default Wizard;

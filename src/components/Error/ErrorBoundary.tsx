@@ -13,7 +13,7 @@ interface State {
 class ErrorBoundary extends Component<Props, State> {
   private retryTimer: number | null = null;
   private retryCount = 0;
-  private maxRetries = 2; // Limited to 2 retries
+  private maxRetries = 2; // Reduced to 2 retries
 
   constructor(props: Props) {
     super(props);
