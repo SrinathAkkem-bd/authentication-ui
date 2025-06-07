@@ -5,7 +5,7 @@ import { Suspense } from "react";
 
 import App from "../pages/App";
 import Profile from "../pages/Profile/Profile";
-import PageLoader from "../pages/Loading/PageLoader";
+import PageLoader from "../components/Loading/PageLoader";
 import ErrorBoundary from "../components/Error/ErrorBoundary";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
