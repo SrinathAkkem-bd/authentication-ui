@@ -1,7 +1,6 @@
 import Layout from "../../components/Layout/Layout";
 import Button from "../../components/Buttons/Button";
 import LoadingOverlay from "../../components/Loading/LoadingOverlay";
-import ErrorMessage from "../../components/Error/ErrorMessage";
 import { useAuth, useLogout } from "../../hooks/useAuth";
 import { BaseComponent } from "../../utils/logger";
 
@@ -22,7 +21,7 @@ class ProfileComponent extends BaseComponent {
 const profileComponent = new ProfileComponent();
 
 const Profile = () => {
-  const { data: userData, isLoading, error, refetch } = useAuth();
+  const { data: userData, isLoading } = useAuth();
   const logoutMutation = useLogout();
 
   profileComponent.debugProfileData(userData);
@@ -30,19 +29,6 @@ const Profile = () => {
   const handleLogout = () => {
     logoutMutation.mutate();
   };
-
-  if (error) {
-    return (
-      <Layout>
-        <div className="max-w-[700px] w-full">
-          <ErrorMessage 
-            message="Failed to load profile data. Please try again."
-            onRetry={() => refetch()}
-          />
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>

@@ -32,8 +32,12 @@ class AuthHook extends BaseComponent {
         return userData;
       },
       retry: (failureCount, error: any) => {
+        // Log errors silently but don't show to user
+        this.log.error(`Authentication attempt ${failureCount + 1} failed:`, error?.message);
+        
         // Don't retry on 401 errors (unauthorized)
         if (error?.response?.status === 401) {
+          this.log.info('User not authenticated (401), stopping retries');
           return false;
         }
         return failureCount < 2;
@@ -41,6 +45,8 @@ class AuthHook extends BaseComponent {
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
+      // Silent error handling - never throw errors to UI
+      throwOnError: false,
     });
   }
 
@@ -61,11 +67,13 @@ class AuthHook extends BaseComponent {
       },
       onError: (error) => {
         this.log.error('Error during logout:', error);
-        // Even if logout fails on server, clear local session
+        // Even if logout fails on server, clear local session silently
         sessionStore.clearSession();
         queryClient.clear();
         navigate({ to: '/' });
       },
+      // Silent error handling
+      throwOnError: false,
     });
   }
 }

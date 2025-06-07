@@ -15,6 +15,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
+        // Log errors silently
+        logger.error("QueryClient", `Query failed (attempt ${failureCount + 1}):`, error?.message);
+        
         // Don't retry on 401 errors
         if (error?.response?.status === 401) {
           return false;
@@ -25,6 +28,12 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       refetchOnMount: true,
+      // Silent error handling - never throw errors to UI
+      throwOnError: false,
+    },
+    mutations: {
+      // Silent error handling for mutations too
+      throwOnError: false,
     },
   },
 });
@@ -73,15 +82,15 @@ const indexRoute = createRoute({
         },
       });
     } catch (error) {
+      // Handle all errors silently - log but don't show to user
       if (error instanceof Error && error.message.includes("401")) {
         logger.info("Route", "No active session, staying on login page");
-        return {};
+      } else if (error instanceof Error && error.name === "RedirectError") {
+        throw error; // Allow redirects to work
+      } else {
+        logger.error("Route", `Authentication check failed: ${error}`);
       }
-      if (error instanceof Error && error.name === "RedirectError") {
-        throw error;
-      }
-      logger.error("Route", `Unexpected error during authentication check: ${error}`);
-      return {};
+      return {}; // Always return successfully to show login page
     }
   },
   component: App,
@@ -108,7 +117,8 @@ const ProfileRoute = createRoute({
         userData,
       };
     } catch (error) {
-      logger.error("Route", "No valid session found, redirecting to login");
+      // Handle errors silently - redirect to login without showing error
+      logger.error("Route", "Authentication failed for profile, redirecting to login");
       sessionStore.clearSession();
       return redirect({
         to: "/",

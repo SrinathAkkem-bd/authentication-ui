@@ -1,6 +1,5 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
-import Layout from '../Layout/Layout';
-import Button from '../Buttons/Button';
+import { logger } from '../../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -8,7 +7,6 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error?: Error;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -17,34 +15,22 @@ class ErrorBoundary extends Component<Props, State> {
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(): State {
+    return { hasError: false }; // Never show error UI to users
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    // Log error silently in background for developers
+    logger.error('ErrorBoundary', 'Application error caught:', error.message);
+    logger.debug('ErrorBoundary', 'Error details:', { error, errorInfo });
+    
+    // Attempt to recover silently
+    setTimeout(() => {
+      this.setState({ hasError: false });
+    }, 100);
   }
 
   render() {
-    if (this.state.hasError) {
-      return (
-        <Layout>
-          <div className="flex flex-col items-center justify-center gap-6 bg-[#131313] p-8 rounded-lg max-w-md">
-            <div className="text-red-500 text-6xl">⚠️</div>
-            <div className="text-center">
-              <h2 className="text-xl font-bold text-gray-100 mb-2">Something went wrong</h2>
-              <p className="text-gray-400 text-sm mb-4">
-                An unexpected error occurred. Please try refreshing the page.
-              </p>
-            </div>
-            <Button onClick={() => window.location.reload()}>
-              Refresh Page
-            </Button>
-          </div>
-        </Layout>
-      );
-    }
-
     return this.props.children;
   }
 }
