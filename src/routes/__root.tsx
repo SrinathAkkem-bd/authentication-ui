@@ -1,4 +1,4 @@
-import { createRoute, redirect } from "@tanstack/react-router";
+import { createRoute, redirect, notFound } from "@tanstack/react-router";
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense } from "react";
@@ -8,12 +8,10 @@ import Wizard from "../pages/Wizard/Wizard";
 import InstallOrg from "../pages/InstallOrg/InstallOrg";
 import PageLoader from "../components/Loading/PageLoader";
 import ErrorBoundary from "../components/Error/ErrorBoundary";
-import NetworkErrorBoundary from "../components/Error/NetworkErrorBoundary";
 import SessionMonitor from "../components/Session/SessionMonitor";
 import useToken from "../lib/useToken";
 import { logger } from "../utils/logger";
 import SessionStore from "../lib/sessionStore";
-import Axios from "../lib/Axios";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,16 +57,20 @@ export const sessionStore = new SessionStore(queryClient);
 export const rootRoute = createRootRoute({
   component: () => (
     <ErrorBoundary>
-      <NetworkErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <Suspense fallback={<PageLoader message="Loading..." />}>
-            <Outlet />
-            <SessionMonitor />
-          </Suspense>
-        </QueryClientProvider>
-      </NetworkErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<PageLoader message="Loading..." />}>
+          <Outlet />
+          <SessionMonitor />
+        </Suspense>
+      </QueryClientProvider>
     </ErrorBoundary>
   ),
+  notFoundComponent: () => {
+    // Redirect any unknown routes to login page
+    logger.warn("Route", "Unknown route accessed, redirecting to login");
+    window.location.href = '/';
+    return <PageLoader message="Redirecting..." />;
+  },
 });
 
 const indexRoute = createRoute({
@@ -204,6 +206,22 @@ const WizardRoute = createRoute({
   component: Wizard,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, InstallOrgRoute, WizardRoute]);
+// Catch-all route for any undefined paths - redirect to login
+const catchAllRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/$",
+  beforeLoad: () => {
+    logger.warn("Route", "Catch-all route triggered, redirecting to login");
+    return redirect({ to: "/" });
+  },
+  component: () => <PageLoader message="Redirecting..." />,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute, 
+  InstallOrgRoute, 
+  WizardRoute,
+  catchAllRoute
+]);
 
 export default routeTree;
