@@ -22,7 +22,7 @@ class ProfileComponent extends BaseComponent {
 const profileComponent = new ProfileComponent();
 
 const Profile = () => {
-  const { data: userData, isLoading, error } = useAuth();
+  const { data: userData, isLoading } = useAuth();
   const logoutMutation = useLogout();
   const refreshMutation = useSessionRefresh();
 
@@ -49,8 +49,9 @@ const Profile = () => {
           <div className="flex flex-col gap-[20px] w-full">
             <div className="flex justify-between items-center">
               <h1 className="text-[24px] text-gray-100">Profile</h1>
+              {/* Only show offline indicator, no error messages */}
               {!navigator.onLine && (
-                <div className="bg-yellow-600 text-white px-3 py-1 rounded text-sm">
+                <div className="bg-gray-600 text-white px-3 py-1 rounded text-sm">
                   Offline
                 </div>
               )}
@@ -62,7 +63,7 @@ const Profile = () => {
                 <p className="text-gray-300">{userData?.name || 'Loading...'}</p>
               </div>
 
-              {/* Session Status */}
+              {/* Session Status - only in development */}
               {sessionInfo && import.meta.env.DEV && (
                 <div className="bg-gray-800 p-3 rounded text-sm">
                   <h3 className="text-gray-100 font-semibold mb-2">Session Status</h3>
@@ -73,15 +74,6 @@ const Profile = () => {
                     <div>Time Remaining: {Math.floor(sessionInfo.timeRemaining / 1000 / 60)} minutes</div>
                     {sessionInfo.isRenewing && <div className="text-yellow-400">Renewing session...</div>}
                   </div>
-                </div>
-              )}
-
-              {/* Error Display */}
-              {error && (
-                <div className="bg-red-900/20 border border-red-500/30 p-3 rounded text-sm">
-                  <p className="text-red-400">
-                    Connection issue detected. Your session will be restored automatically when connection is available.
-                  </p>
                 </div>
               )}
 

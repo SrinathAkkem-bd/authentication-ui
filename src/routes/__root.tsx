@@ -25,19 +25,23 @@ const queryClient = new QueryClient({
           return false;
         }
         
-        // Don't retry on network errors beyond 3 attempts
+        // More aggressive retries for network errors
         if (error?.code === 'NETWORK_ERROR' || error?.name === 'TypeError') {
-          return failureCount < 2;
+          return failureCount < 10;
         }
         
-        return failureCount < 2;
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => {
+        // Exponential backoff with jitter
+        const baseDelay = Math.min(1000 * Math.pow(2, attemptIndex), 30000);
+        const jitter = Math.random() * 1000;
+        return baseDelay + jitter;
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       refetchOnMount: true,
-      // Retry delay with exponential backoff
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       // Silent error handling - never throw errors to UI
       throwOnError: false,
     },
@@ -49,8 +53,9 @@ const queryClient = new QueryClient({
         if (error?.response?.status === 401) {
           return false;
         }
-        return failureCount < 1;
+        return failureCount < 2;
       },
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
     },
   },
 });
@@ -62,7 +67,7 @@ export const rootRoute = createRootRoute({
     <ErrorBoundary>
       <NetworkErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <Suspense fallback={<PageLoader message="Loading application..." />}>
+          <Suspense fallback={<PageLoader message="Loading..." />}>
             <Outlet />
             <SessionMonitor />
           </Suspense>

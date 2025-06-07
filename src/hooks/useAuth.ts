@@ -41,11 +41,24 @@ class AuthHook extends BaseComponent {
           this.log.info('User not authenticated (401), stopping retries');
           return false;
         }
-        return failureCount < 2;
+        
+        // For network errors, retry more aggressively
+        if (error?.code === 'NETWORK_ERROR' || error?.name === 'TypeError') {
+          return failureCount < 10; // More retries for network issues
+        }
+        
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => {
+        // Exponential backoff with jitter
+        const baseDelay = Math.min(1000 * Math.pow(2, attemptIndex), 30000);
+        const jitter = Math.random() * 1000;
+        return baseDelay + jitter;
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
+      refetchOnMount: true,
       refetchInterval: (data, query) => {
         // Only refetch if we have data and no errors
         if (data && !query.state.error) {
@@ -65,7 +78,12 @@ class AuthHook extends BaseComponent {
     return useMutation({
       mutationFn: async () => {
         this.log.info('Initiating logout process');
-        await Axios.get('/auth/logout');
+        try {
+          await Axios.get('/auth/logout');
+        } catch (error) {
+          // Ignore logout errors - we'll clear local session anyway
+          this.log.warn('Logout request failed, clearing local session anyway');
+        }
       },
       onSuccess: () => {
         sessionStore.clearSession();
@@ -102,6 +120,7 @@ class AuthHook extends BaseComponent {
       },
       onError: (error) => {
         this.log.error('Failed to refresh session:', error);
+        // Don't show error to user, just log it
       },
       throwOnError: false,
     });
@@ -113,14 +132,17 @@ const authHook = new AuthHook();
 export const useAuth = () => {
   const query = authHook.createAuthQuery();
   
-  // Monitor for session changes and errors
+  // Monitor for session changes and errors silently
   useEffect(() => {
     if (query.error) {
       const error = query.error as any;
       if (error?.response?.status === 401) {
-        // Session expired, clear and redirect
+        // Session expired, clear and redirect silently
         sessionStore.clearSession();
-        window.location.href = '/';
+        // Use setTimeout to avoid navigation during render
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
       }
     }
   }, [query.error]);
@@ -143,7 +165,10 @@ export const useSessionMonitor = () => {
   useEffect(() => {
     const handleSessionExpired = () => {
       queryClient.clear();
-      window.location.href = '/';
+      // Use setTimeout to avoid navigation during render
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
     };
 
     const handleSessionRestored = () => {

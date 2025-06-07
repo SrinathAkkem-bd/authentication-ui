@@ -1,6 +1,6 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
 import { logger } from '../../utils/logger';
-import Button from '../Buttons/Button';
+import PageLoader from '../Loading/PageLoader';
 
 interface Props {
   children: ReactNode;
@@ -15,7 +15,8 @@ interface State {
 
 class NetworkErrorBoundary extends Component<Props, State> {
   private retryCount = 0;
-  private maxRetries = 3;
+  private maxRetries = 5;
+  private retryTimer: number | null = null;
 
   constructor(props: Props) {
     super(props);
@@ -46,83 +47,31 @@ class NetworkErrorBoundary extends Component<Props, State> {
     
     this.setState({ errorInfo });
 
-    // Auto-retry for network errors
+    // Auto-retry silently for network errors
     if (this.state.isNetworkError && this.retryCount < this.maxRetries) {
       this.retryCount++;
-      logger.info('NetworkErrorBoundary', `Auto-retry attempt ${this.retryCount}/${this.maxRetries}`);
+      logger.info('NetworkErrorBoundary', `Silent auto-retry attempt ${this.retryCount}/${this.maxRetries}`);
       
-      setTimeout(() => {
+      const delay = Math.min(1000 * Math.pow(2, this.retryCount), 10000); // Max 10 seconds
+      this.retryTimer = window.setTimeout(() => {
         this.setState({ hasError: false, error: null, errorInfo: null });
-      }, 2000 * this.retryCount); // Exponential backoff
+      }, delay);
+    } else if (this.retryCount >= this.maxRetries) {
+      // After max retries, just show loading indefinitely
+      logger.warn('NetworkErrorBoundary', 'Max retries reached, showing loading state');
     }
   }
 
-  handleRetry = () => {
-    logger.info('NetworkErrorBoundary', 'Manual retry triggered');
-    this.retryCount = 0;
-    this.setState({ hasError: false, error: null, errorInfo: null });
-  };
-
-  handleRefresh = () => {
-    logger.info('NetworkErrorBoundary', 'Page refresh triggered');
-    window.location.reload();
-  };
+  componentWillUnmount() {
+    if (this.retryTimer) {
+      window.clearTimeout(this.retryTimer);
+    }
+  }
 
   render() {
-    if (this.state.hasError && this.state.isNetworkError) {
-      return (
-        <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center p-4">
-          <div className="bg-[#131313] p-8 rounded-lg max-w-md w-full text-center">
-            <div className="text-red-400 text-6xl mb-4">⚠️</div>
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Connection Problem
-            </h2>
-            <p className="text-gray-300 mb-6">
-              We're having trouble connecting to our servers. This might be due to:
-            </p>
-            <ul className="text-gray-400 text-sm mb-6 text-left space-y-1">
-              <li>• Network connectivity issues</li>
-              <li>• Server maintenance</li>
-              <li>• Temporary service disruption</li>
-            </ul>
-            
-            <div className="space-y-3">
-              <Button onClick={this.handleRetry}>
-                Try Again
-              </Button>
-              <Button 
-                onClick={this.handleRefresh}
-                className="bg-gray-600 hover:bg-gray-700"
-              >
-                Refresh Page
-              </Button>
-            </div>
-            
-            {this.retryCount > 0 && (
-              <p className="text-yellow-400 text-sm mt-4">
-                Retry attempts: {this.retryCount}/{this.maxRetries}
-              </p>
-            )}
-          </div>
-        </div>
-      );
-    }
-
     if (this.state.hasError) {
-      // For non-network errors, show minimal error UI
-      return (
-        <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center p-4">
-          <div className="bg-[#131313] p-8 rounded-lg max-w-md w-full text-center">
-            <div className="text-red-400 text-4xl mb-4">❌</div>
-            <h2 className="text-lg font-semibold text-gray-100 mb-4">
-              Something went wrong
-            </h2>
-            <Button onClick={this.handleRefresh}>
-              Refresh Page
-            </Button>
-          </div>
-        </div>
-      );
+      // Always show loading state instead of error messages
+      return <PageLoader message="Loading..." />;
     }
 
     return this.props.children;

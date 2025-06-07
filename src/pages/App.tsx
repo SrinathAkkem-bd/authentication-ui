@@ -4,14 +4,15 @@ import GithubLogin from "./Auth/GithubLogin";
 import PageLoader from "../components/Loading/PageLoader";
 
 const App = () => {
-  const { isLoading } = useAuth();
+  const { isLoading, data: userData } = useAuth();
 
   // Show loading state while checking authentication
   if (isLoading) {
-    return <PageLoader message="Checking authentication..." />;
+    return <PageLoader message="Authenticating..." />;
   }
 
-  // Always show login form - errors are handled silently
+  // If user is authenticated, redirect will happen automatically
+  // This component only shows when user needs to login
   return (
     <Layout>
       <div className="items-center flex-col flex bg-[#131313] p-5 rounded-lg">
