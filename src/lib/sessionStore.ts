@@ -17,13 +17,13 @@ class SessionStore extends BaseComponent {
   private readonly ENCRYPTION_KEY: string;
   private readonly SESSION_TIMEOUT: number;
   private readonly SESSION_RENEWAL_THRESHOLD: number;
-  private readonly VALIDATION_INTERVAL: number = 5 * 60 * 1000; // 5 minutes instead of 30 seconds
+  private readonly VALIDATION_INTERVAL: number = 10 * 60 * 1000; // 10 minutes - much less frequent
   private sessionTimer: number | null = null;
   private renewalTimer: number | null = null;
   private validationTimer: number | null = null;
   private isRenewing = false;
   private retryCount = 0;
-  private readonly MAX_RETRIES = 2; // Reduced from 3
+  private readonly MAX_RETRIES = 2;
   private lastValidationTime = 0;
 
   constructor(queryClient: QueryClient) {
@@ -180,29 +180,28 @@ class SessionStore extends BaseComponent {
 
     // Prevent duplicate validation calls
     const now = Date.now();
-    if (now - this.lastValidationTime < 10000) { // 10 second cooldown
+    if (now - this.lastValidationTime < 30000) { // 30 second cooldown
       this.log.debug('Skipping validation - too recent');
       return;
     }
     this.lastValidationTime = now;
 
     try {
-      this.log.debug('Validating session with server');
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/validate`, {
+      this.log.debug('Validating session with server using /auth/user_info');
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/user_info`, {
         credentials: 'include',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       if (response.ok) {
+        const userData = await response.json();
         this.retryCount = 0;
-        // Update last validated time
-        const session = this.getSession();
-        if (session) {
-          this.updateSession({
-            ...session,
-            lastValidated: Date.now()
-          });
-        }
+        // Update session with fresh data and mark as validated
+        this.updateSession({
+          ...userData,
+          lastValidated: Date.now()
+        });
+        this.log.success('Session validated and updated with fresh data');
         this.startValidationTimer();
       } else if (response.status === 401) {
         this.log.warn('Session invalid on server');
@@ -224,7 +223,8 @@ class SessionStore extends BaseComponent {
       this.handleSessionExpired();
     } else {
       // Retry with exponential backoff
-      const delay = Math.pow(2, this.retryCount) * 2000; // 2s, 4s
+      const delay = Math.pow(2, this.retryCount) * 5000; // 5s, 10s
+      this.log.debug(`Retrying validation in ${delay}ms`);
       setTimeout(() => this.validateSessionWithServer(), delay);
     }
   }
@@ -247,7 +247,7 @@ class SessionStore extends BaseComponent {
   private startValidationTimer() {
     this.stopValidationTimer();
     
-    // Validate session every 5 minutes instead of 30 seconds
+    // Validate session every 10 minutes instead of frequently
     this.validationTimer = window.setInterval(() => {
       if (navigator.onLine && this.hasActiveSession()) {
         const session = this.getSession();
@@ -277,20 +277,19 @@ class SessionStore extends BaseComponent {
         return;
       }
 
-      this.log.info('Attempting to renew session');
+      this.log.info('Attempting to renew session using /auth/user_info');
       
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/renew`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/user_info`, {
         credentials: 'include',
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       if (response.ok) {
         const renewedData = await response.json();
-        // Update session with new data if provided, otherwise just update timestamp
-        const updatedSession = renewedData ? { ...currentSession, ...renewedData } : currentSession;
-        updatedSession.lastValidated = Date.now(); // Mark as validated
+        // Update session with fresh data and mark as validated
+        const updatedSession = { ...renewedData, lastValidated: Date.now() };
         this.updateSession(updatedSession);
-        this.log.success('Session renewed successfully');
+        this.log.success('Session renewed successfully with fresh data');
         this.retryCount = 0;
       } else if (response.status === 401) {
         this.log.warn('Session renewal failed - unauthorized');
@@ -314,7 +313,7 @@ class SessionStore extends BaseComponent {
       this.handleSessionExpired();
     } else {
       // Retry renewal with exponential backoff
-      const delay = Math.pow(2, this.retryCount) * 2000; // 2s, 4s
+      const delay = Math.pow(2, this.retryCount) * 5000; // 5s, 10s
       setTimeout(() => this.renewSession(), delay);
     }
   }
